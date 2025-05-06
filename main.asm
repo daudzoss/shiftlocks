@@ -27,17 +27,12 @@ topline	.text	"the crime scene     "
 	.text	"  shiftlocks office"
 	.text	$9d,$9d,$9d,$9d
 	.text	$9d,$9d,$9d,$9d
-	.text	$94,"'",$22
-	.text	$3a,$99,$3a,$99
-	.null	$3a,$99,$3a,$99
+	.text	$94,"'"
+	.null	$11,$11,$11,$11,$22
 +	.word	(+), 2055
 	.text	$99,$22
 	.text	"                 "
-.if BASIC
-	.null	$6e,$22
-.else
-	.null	"/",$22
-.endif
+	.null	$ce,$22
 +	.word	(+), 2055
 	.text	$99,$22
 	.text	"    threats      "
@@ -69,11 +64,7 @@ topline	.text	"the crime scene     "
 	.text	" ",$5e,"f5"
 	.text	" ",$5e,"f7"
 	.text	"     "
-.if BASIC
-	.null	$6e,$22
-.else
-	.null	"/",$22
-.endif
+	.null	$ce,$22
 +	.word	(+), 2055
 	.text	$99,$22
 	.text	"                  "
@@ -99,7 +90,7 @@ topline	.text	"the crime scene     "
 	.text	" f2",$c0," f4",$c0
 	.text	" f6",$c0," f8",$c0
 	.text	" to solve: 3 col"
-	.text	" of  ",$c0,$77
+	.text	" of  ",$c0,$d7
 	.text	$9d,$9d,$9d,$94
 	.null	$34,$22,$3a,$99
 +	.word	(+),2055	
@@ -121,10 +112,149 @@ topline	.text	"the crime scene     "
 *	= COPIED2
 .endif
 	
+SCREEND	= SCREENC-SCREENM
+SCRSIZE	= SCREENW*SCREENH
+ONLYTOP	= SCREENM+SCREENW*(SCREENH-8)
+
+stackht	= vararea + $0		; 0-3 invest, 4-7 threat, 8-11 office
+;????	= vararea + $0c
+	
 start
 
+;;; 1,2,3,4 = 000,001,010,011
+;;; A,B,C,D = 100,101,110,111
+cardnum
+invest0	.text	$b1,$b2,$b3,$b4	; const
+threat0	.text	$81,$82,$83,$84
+cardtyp
+investc	.text	$c0,$d7
+threatc	.text	$db,$c0
+cardclr	.text	$62,$63,$64,$65
+	.text	$66,$67,$68,$69
+	
 main
-	jsr	$ffe4
-	beq	main
+-	jsr	$ffe4
+	beq	-
+	ldx	#$08		;
+	ldy	#$17		;
+	lda	#3		;
+	jsr	cardsho		;
+-	jsr	$ffe4
+	beq	-
 	rts
+	
+	
+cardsho	pha			;
+	cpx	#SCREENW	;
+	bcs	++		; just skip the selfmod, use last value
+	lda	#<SCREENM	;
+	sta	selfsha		;
+	lda	#>SCREENM	;
+	sta	1+selfsha	;
+	tya			;
+	beq	+		;
+	cpy	#SCREENH-1	;
+	bcc	+		;
+	pla			;
+	jmp	cardout		; return;
++	lda	#SCREENW	;
+	;clc			;
+	adc	selfsha		;
+	sta	selfsha		;
+	lda	#0		;
+	adc	1+selfsha	;
+	sta	1+selfsha	;
+	dey			;
+	bne	-		;
++	txa			;
+	clc			;
+	adc	selfsha		;
+	sta	selfsha		;
+	lda	#0		;
+	adc	1+selfsha	;
+	sta	1+selfsha	;
+	clc			;
+	lda	selfsha		;
+	adc	#<+SCREEND	;
+	sta	selfcla		;
+	lda	1+selfcla	;
+	adc	#0		;
+	sta	1+selfcla	;
+	
+
++	pla			;
+	clc			;
+	adc	#$f8		; c = (a & 0x04) ? 1 : 0; // move bit 2 to carry
+	tax			;
+	and	#$07		; a &= 07;
+	tay			;
+
+	lda	cardnum,y	;
+	ldy	#0		;
+	jsr	selfsho		;
+	
+	bcs	+		;
+	lda	investc,y	;
+	bcc	++		;
++	lda	threatc,y	;
++	iny			;
+	jsr	selfsho		;
+	
+	bcs	+		;
+	lda	investc,y	;
+	bcc	++		;
++	lda	threatc,y	;
++	iny			;
+	jsr	selfsho		;
+	
+	ldy	#2		;
+	lda	1+selfsha	;
+	cmp	#>ONLYTOP	;
+	bcs	cardtop		;
+	bne	+		;
+	lda	selfsha		;
+	cmp	#<ONLYTOP	;
+	bcs	cardtop		;
+	
++	ldy	#SCREENW*5	;
+-	tya			;
+	sec			;
+	sbc	#SCREENW	;
+	tay			;
+	lda	#$a0		;
+	cpx	#8		;
+	bcc	+		;
+blankit	lda	#$20		;
++	jsr	selfsho		;
+	iny			;
+	jsr	selfsho		;
+	iny			;
+	jsr	selfsho		;
+cardtop	lda	cardclr,x	;
+	jsr	selfclr		;
+	dey			;	
+	jsr	selfclr		;
+	dey			;	
+	jsr	selfclr		;
+	cpy	#0		;
+	bne	-		;
+cardout	rts			;
+
+selfsho	.byte	$99		;static uint8_t* selfsha = SCREENM;
+selfsha	.byte	<SCREENM	;void selfsho(uint8_t a, uint8_t y) {
+	.byte	>SCREENM	; selfsha[y] = a; // sta $XXXX,y
+	rts			;} // selfsho()
+
+selfclr	.byte	$99		;
+selfcla	.byte	<SCREENC	;
+	.byte	>SCREENC	;
+	rts			;
+
+
+
+
+
+
+vararea
 pre_end
+.end
