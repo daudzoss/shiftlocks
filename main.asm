@@ -125,9 +125,10 @@ HANDREM = DISCARD +2*DECKSIZ	; should always be 0 or 4?
 DISCREM	= DISCARD +2*DECKSIZ+ 1
 DECKREM	= DISCARD +2*DECKSIZ+ 2
 NWOUNDS	= DISCARD +2*DECKSIZ+ 3
-HANDGET	= DISCARD +2*DECKSIZ+ 4?
-HANDFOM	= DISCARD +2*DECKSIZ+ 5?
-;????	= DISCARD +2*DECKSIZ+ 6
+HANDHST	= DISCARD +2*DECKSIZ+ 4
+HANDGET	= DISCARD +2*DECKSIZ+ $c?
+HANDFOM	= DISCARD +2*DECKSIZ+ $d?
+;????	= DISCARD +2*DECKSIZ+ $e?
 TEMPVAR	= DISCARD +2*DECKSIZ+ $f
 
 start
@@ -388,13 +389,17 @@ drw1new	ldy	DECKREM		;int8_t drw1new(void) {
 +	lda	#$ff		;  return -1;
 	rts			;} // drw1new()
 
-drwlnyb	.text	$01,$02,$04,$08	;static const uint8_t drwlnyb[] = {1, 2, 4, 8};
-drwhnyb	.text	$10,$20,$40,$80	;static const uint8_t drwhnyb[] = {16,32,64,128,
+drwflag	.text	$01,$02,$04,$08	;static const uint8_t drwflag[] = {1, 2, 4, 8,
 	.text	$10,$20,$40,$80	;                                 16,32,64,128};
 drw4hnd	lda	HANDREM		;void drw4hand(void) {
-	bne	+++		; if (HANDREM == 0) { // should've emptied first
+	bne	++		; if (HANDREM == 0) { // should've emptied first
+	ldy	#0		;
+	ldx	#8		;  register uint8_t x;
+	sty	HANDHST-1,x	;  for (x = 7; x >= 0; x--)
+	dex			;   HANDHST[x] = 0; // clear the card histogram
+	bne	-		;
 	ldx	#4		;  uint8_t retval = 0; // return figure of merit
--	pha			;  for (register uint8_t x = 3; x >= 0; x--) {
+-	pha			;  for (x = 3; x >= 0; x--) {
 	jsr	drw1new		;   register uint8_t a = drw1new();
 	bpl	+		;   if (a < 0) { // deck ran out
 	txa			;
@@ -417,15 +422,34 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	sta	HAND-1,x	;   HAND[x] = a /* & 0x07 */;
 	tay			;
 	pla			;
-	cpy	#4		;
-	bcc	+		;   if (HAND[x] >= 4)//(HAND[x]>=4)?1<<x:0;//T:I
-	ora	drwlnyb-1,x	;    retval |= drwlnyb[x];
-+	ora	drwhnyb,y	;   retval |= drwhnyb[HAND[x]]; // nybbles valid
+	ora	drwflag,y	;   retval |= drwflag[a]];
 	dex			;  }
 	bne	--		;  return retval;
 	rts			; } else
 +	lda	#0		;  return 0;
 	rts			;} // drw4hand()
+
+redrwok	sta	TEMPVAR		;uint8_t redrwok(register uint8_t& a) {
+	and	#$0f		; if (a & 0x0f == 0) // got no investig. cards
+	beq	+++++		;  return 1;
+	lda	TEMPVAR		;
+	and	#$f0		; else if (a & 0xf0 == 0) // got no threat cards
+	beq	+++++		;  return 1;
+	lda	#0		; TEMPVAR = a;
+	clc			;
+	rol	TEMPVAR		;
+-	ror	TEMPVAR		; for (a = 0; TEMPVAR; TEMPVAR >>= 1) // 1 count
+	beq	+		;
+	adc	#0		;
+	bcc	-		;  a++;  // (this adc will never set carry)
++	cmp	#3		; if (a >= 3) { // got no card at least 3 times
+	bcs	++		;  
+	bcc	+		;
+rdtally	.fill	8		;  static uint8_t rdtally[8];
++
+	
++	lda	#1		;
+	rts			;} // redrwok()
 
 redrwok	pha			;uint8_t redrwok(register uint8_t& a) {
 	and	#$0f		;
