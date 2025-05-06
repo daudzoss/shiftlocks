@@ -24,17 +24,18 @@ COPIED2	= $0400
 	.text	$99,$22,$09,$8e	; PRINT " CHR$(9) CHR$(142)
 	.text	$08,$93,$13,$13	; CHR$(8) CHR$(147) CHR$(19) CHR$(19)
 topline	.text	"the crime scene     "
-	.text	"  shiftlock's office"
-	.text	$22,$3a,$99,$3a
-	.null	$99,$3a,$99
+	.text	"  shiftlocks office"
+	.text	$9d,$9d,$9d,$9d
+	.text	$9d,$9d,$9d,$9d
+	.text	$94,"'",$22
+	.text	$3a,$99,$3a,$99
+	.null	$3a,$99,$3a,$99
 +	.word	(+), 2055
-.if BASIC
 	.text	$99,$22
 	.text	"                 "
+.if BASIC
 	.null	$6e,$22
 .else
-	.text	$99,$3a,$99,$22
-	.text	"                 "
 	.null	"/",$22
 .endif
 +	.word	(+), 2055
