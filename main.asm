@@ -158,6 +158,8 @@ drawx	.text	$11
 drawy	.text	$05
 discx	.text	$12
 discy	.text	$0b
+inhandx	.text	$01,$05,$09,$0d
+inhandy	.text	$10;,$10,$10,$10
 stackx	.text	$00,$04,$08,$0c
 	.text	$00,$04,$08,$0c	
 	.text	$16,$1b,$20,$25
@@ -452,8 +454,22 @@ redrwok	sta	TEMPVAR		;uint8_t redrwok(register uint8_t& a) {
 	adc	#1		;
 +	rts			;} // redrwok()
 
-drewall	rts			;
-animhnd	rts			;
+animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
+	beq	+		; if (HANDREM) {
+-	txa			;  for (register int8_t x = 3; x >= 0; x--) {
+	pha			;
+	lda	HAND-1,x	;   register int8_t a = HAND[x];
+	pha			;
+	lda	inhandx-1,x	;
+	tax			;
+	pla			;
+	ldy	inhandy ;-1,x	;
+	jsr	cardsho		;   cardsho(a, inhandx[a], inhandy/*[a]*/);
+	pla			;
+	tax			;
+	dex			;  }
+	bne	-		; }
++	rts			;} // animhnd()
 
 pre_end
 .align	$40
