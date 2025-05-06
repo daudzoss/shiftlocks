@@ -159,7 +159,7 @@ main	lda	#0		;
 	
 cardsho	pha			;void cardsho(register uint8_t& a,
 	cpx	#SCREENW	;              register uint8_t& x,
-	bcs	++		;              register uint8_t& y) {
+	bcs	+++		;              register uint8_t& y) {
 	lda	#<SCREENM	; if (x < SCREENW) { // otherwise just skip the selfmod, use last value
 	sta	selfsha		; 
 	lda	#>SCREENM	;
@@ -194,7 +194,7 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 	lda	1+selfsha	;
 	.endif
 	adc	#>+SCREEND	;
-	sta	1+selfcla	;  selfcla = 0xffff & (selfsha + SCREEND
+	sta	1+selfcla	;  selfcla = 0xffff & (selfsha + SCREEND);
 	
 
 +	pla			; }
