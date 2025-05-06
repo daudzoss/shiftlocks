@@ -126,8 +126,8 @@ DISCREM	= DISCARD +2*DECKSIZ+ 1
 DECKREM	= DISCARD +2*DECKSIZ+ 2
 NWOUNDS	= DISCARD +2*DECKSIZ+ 3
 HANDHST	= DISCARD +2*DECKSIZ+ 4
-HANDGET	= DISCARD +2*DECKSIZ+ $c?
-HANDFOM	= DISCARD +2*DECKSIZ+ $d?
+HANDGET	= DISCARD +2*DECKSIZ+ $c;?
+HANDFOM	= DISCARD +2*DECKSIZ+ $d;?
 ;????	= DISCARD +2*DECKSIZ+ $e?
 TEMPVAR	= DISCARD +2*DECKSIZ+ $f
 
@@ -176,15 +176,10 @@ main	lda	#0		;void main (void) {
 -	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
 	jsr	drw4hnd		; 
 	sta	HANDFOM		; HANDFOM = drw4hand(); // nonzero if we drew 4
-
-;	bne	+		;  if (HANDFOM)
-;	jsr	drewall		;   break;
-;	and	#$fc		;  if (drewall() >= 4) // also the new DECKREM
-
 	bne	-		; if (HANDFOM == 0)
-	brk			;  break; // more than 44 cards in office?!?
-+	jsr	animhnd		; animhnd(); // draw empty deck pile after, if 0
-
+	brk			;  exit(1); // more than 44 cards in office?!?
+	.text	$1		;
+	jsr	animhnd		; animhnd(); // draw empty deck pile after, if 0
 
 -	jsr	$ffe4		;
 	beq	-		; getchar();
@@ -379,51 +374,50 @@ shuffl2	txa			;  for (register uint8_t x = 255; x; x--) {
 	bne	shuffl1		; }
 	rts			;} //shuffle()
 
-drw1new	ldy	DECKREM		;int8_t drw1new(void) {
-	dey			;
-	bmi	+		; if (DECKREM > 0 /* || DECKREM == -128*/ )
-	dey			;
-	sty	DECKREM		;
-	lda	DECK,y		;  return DECK[--DECKREM];
-	rts			; else
-+	lda	#$ff		;  return -1;
-	rts			;} // drw1new()
+drw1new	ldx	DECKREM		;int8_t drw1new(void) {
+	dex			; // x gets clobbered hence drw4hand() loop on y
+	txa			; if (DECKREM <= 0)
+	bmi	+		;  return /*DECKREM*/ -1;
+	stx	DECKREM		; else
+	lda	DECK,x		;  return DECK[--DECKREM];
++	rts			;} // drw1new()
 
 drwflag	.text	$01,$02,$04,$08	;static const uint8_t drwflag[] = {1, 2, 4, 8,
 	.text	$10,$20,$40,$80	;                                 16,32,64,128};
 drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	bne	++		; if (HANDREM == 0) { // should've emptied first
-	ldy	#0		;
-	ldx	#8		;  register uint8_t x;
-	sty	HANDHST-1,x	;  for (x = 7; x >= 0; x--)
-	dex			;   HANDHST[x] = 0; // clear the card histogram
+	lda	#0		;  register uint8_t a, x, y;
+	ldy	#8		;
+	sta	HANDHST-1,y	;  for (y = 7; y >= 0; y--)
+	dey			;   HANDHST[y] = 0; // clear the card histogram
 	bne	-		;
-	ldx	#4		;  uint8_t retval = 0; // return figure of merit
--	pha			;  for (x = 3; x >= 0; x--) {
-	jsr	drw1new		;   register uint8_t a = drw1new();
+	ldy	#4		;  uint8_t retval = 0; // return figure of merit
+-	pha			;  for (y = 3; y >= 0; y--) {
+	jsr	drw1new		;   a = drw1new();
 	bpl	+		;   if (a < 0) { // deck ran out
-	txa			;
+	tya			;
 	pha			;
-	ldy	DISCREM		;    register int8_t y = DISCREM;
-	sty	DECKREM		;
--	lda	DISCARD-1,y	;    for (DECKREM = y--; y >= 0 ; y--) {
-	sta	DECK-1,y	;     DECK[y] = DISCARD[y];
-	dey			;
+	ldx	DISCREM		;    x = DISCREM;
+	stx	DECKREM		;
+-	lda	DISCARD-1,x	;    for (DECKREM = x--; x >= 0 ; x--) {
+	sta	DECK-1,x	;     DECK[x] = DISCARD[x];
+	dex			;
 	bne	-		;    }
-	sty	DISCREM		;    DISCREM = 0;
+	stx	DISCREM		;    DISCREM = 0;
 	jsr	shuffle		;    shuffle();
 	pla			;
-	tax			;
+	tay			;
 	jsr	drw1new		;    a = drw1new();
 	bpl	+		;    if (a < 0) // all cards evaporated somehow?
-	brk			;     exit(1);
-	.text	1		;   } // a is a valid card in the range 0 ~ 7
+	brk			;     exit(2);
+	.text	2		;   } // a is a valid card in the range 0 ~ 7
 +	;and	#$07		;
-	sta	HAND-1,x	;   HAND[x] = a /* & 0x07 */;
-	tay			;
+	sta	HAND-1,y	;   HAND[y] = a /* & 0x07 */;
+	tax			;
+	inc	HANDHST,x	;   HANDHST[a] += 1; //reflect in hand histogram
 	pla			;
-	ora	drwflag,y	;   retval |= drwflag[a]];
-	dex			;  }
+	ora	drwflag,x	;   retval |= drwflag[a]];
+	dey			;  }
 	bne	--		;  return retval;
 	rts			; } else
 +	lda	#0		;  return 0;
@@ -431,38 +425,30 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 
 redrwok	sta	TEMPVAR		;uint8_t redrwok(register uint8_t& a) {
 	and	#$0f		; if (a & 0x0f == 0) // got no investig. cards
-	beq	+++++		;  return 1;
+	beq	+++		;  return 1;
 	lda	TEMPVAR		;
 	and	#$f0		; else if (a & 0xf0 == 0) // got no threat cards
-	beq	+++++		;  return 1;
+	beq	+++		;  return 1;
 	lda	#0		; TEMPVAR = a;
 	clc			;
 	rol	TEMPVAR		;
--	ror	TEMPVAR		; for (a = 0; TEMPVAR; TEMPVAR >>= 1) // 1 count
+-	ror	TEMPVAR		; for (a = 0; TEMPVAR; TEMPVAR >>= 1) // 1-count
 	beq	+		;
 	adc	#0		;
 	bcc	-		;  a++;  // (this adc will never set carry)
-+	cmp	#3		; if (a >= 3) { // got no card at least 3 times
-	bcs	++		;  
-	bcc	+		;
-rdtally	.fill	8		;  static uint8_t rdtally[8];
-+
-	
-+	lda	#1		;
-	rts			;} // redrwok()
-
-redrwok	pha			;uint8_t redrwok(register uint8_t& a) {
-	and	#$0f		;
-	beq	+		;
-	eor	#$0f		;
-	beq	+		;
-	pla			;
-	lsr			;
-	lsr			;
-	lsr			;
-	lsr			;
-+	lda	#1		; 
-	rts			;} // redrwok())
++	cmp	#3		;
+	bcc	+		; if (a < 3) { // might have 3 copies of a card
+	lda	#1		;
+	ldy	#8		;
+-	ldx	HANDHST-1,y	;  for (register int8_t y = 7; y >= 0; y--)
+	cpx	#3		;   if (HANDHST[y] >= 3)
+	bcs	+++		;    return 1; // indeed have 3 copies of card y
+	dey			;
+	bne	-		; }
++	lda	#$ff		; return 0;
++	clc			;
+	adc	#1		;
++	rts			;} // redrwok()
 
 drewall	rts			;
 animhnd	rts			;
