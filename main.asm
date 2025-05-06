@@ -173,13 +173,13 @@ main	lda	#0		;void main (void) {
 	jsr	finishr		; finishr(); // rule text completed using colors
 	jsr	initstk		; initstk();
 	lda	#DECKSIZ	;
--	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
+	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
 	jsr	drw4hnd		; 
 	sta	HANDFOM		; HANDFOM = drw4hand(); // nonzero if we drew 4
-	bne	-		; if (HANDFOM == 0)
+	bne	+		; if (HANDFOM == 0)
 	brk			;  exit(1); // more than 44 cards in office?!?
 	.text	$1		;
-	jsr	animhnd		; animhnd(); // draw empty deck pile after, if 0
++	jsr	animhnd		; animhnd(); // draw empty deck pile after, if 0
 
 -	jsr	$ffe4		;
 	beq	-		; getchar();
@@ -386,9 +386,8 @@ drwflag	.text	$01,$02,$04,$08	;static const uint8_t drwflag[] = {1, 2, 4, 8,
 	.text	$10,$20,$40,$80	;                                 16,32,64,128};
 drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	bne	++		; if (HANDREM == 0) { // should've emptied first
-	lda	#0		;  register uint8_t a, x, y;
-	ldy	#8		;
-	sta	HANDHST-1,y	;  for (y = 7; y >= 0; y--)
+	ldy	#8		;  register uint8_t a, x, y;
+-	sta	HANDHST-1,y	;  for (y = 7; y >= 0; y--)
 	dey			;   HANDHST[y] = 0; // clear the card histogram
 	bne	-		;
 	ldy	#4		;  uint8_t retval = 0; // return figure of merit
@@ -415,13 +414,15 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 +	;and	#$07		;
 	sta	HAND-1,y	;   HAND[y] = a /* & 0x07 */;
 	tax			;
-	inc	HANDHST,x	;   HANDHST[a] += 1; //reflect in hand histogram
+	inc	HANDHST,x	;   HANDHST[a]++; // reflected in hand histogram
+	inc	HANDREM		;   HANDREM++; // hand size grows toward 4 by 1
 	pla			;
 	ora	drwflag,x	;   retval |= drwflag[a]];
 	dey			;  }
-	bne	--		;  return retval;
+	bne	--		;
+	tax			;  return retval; // Z will be clear
 	rts			; } else
-+	lda	#0		;  return 0;
++	lda	#0		;  return 0; // Z will be set
 	rts			;} // drw4hand()
 
 redrwok	sta	TEMPVAR		;uint8_t redrwok(register uint8_t& a) {
