@@ -111,14 +111,14 @@ topline	.text	"the crime scene     "
 .if !BASIC
 *	= COPIED2
 .endif
-	
+
 SCREEND	= SCREENC-SCREENM
 SCRSIZE	= SCREENW*SCREENH
 ONLYTOP	= SCREENM+SCREENW*(SCREENH-8)
 
 stackht	= vararea + $0		; 0-3 invest, 4-7 threat, 8-11 office
 ;????	= vararea + $0c
-	
+
 start
 
 ;;; 1,2,3,4 = 000,001,010,011
@@ -131,7 +131,7 @@ investc	.text	$c0,$d7
 threatc	.text	$db,$c0
 cardclr	.text	$62,$63,$64,$65
 	.text	$66,$67,$68,$69
-	
+
 main	lda	#0		;
 -	pha			;
 	pha			;
@@ -146,7 +146,7 @@ main	lda	#0		;
 	lsr			;
 	ldy	#$17		;
 	jsr	cardsho		;
-	
+
 	pla			;
 	clc			;
 	adc	#$01		;
@@ -156,11 +156,10 @@ main	lda	#0		;
 	beq	-
 	rts
 	
-	
 cardsho	pha			;void cardsho(register uint8_t& a,
 	cpx	#SCREENW	;              register uint8_t& x,
 	bcs	+++		;              register uint8_t& y) {
-	lda	#<SCREENM	; if (x < SCREENW) { // otherwise just skip the selfmod, use last value
+	lda	#<SCREENM	; if (x < SCREENW) {
 	sta	selfsha		; 
 	lda	#>SCREENM	;
 	sta	1+selfsha	;  selfsha = SCREENM;
@@ -169,7 +168,7 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 	pla			;
 	jmp	cardout		;   return; // not allowed to draw even one line
 +	tya			;
-	beq	++		;  if (y > 0)
+	beq	+		;
 -	clc			;
 	lda	#SCREENW	;
 	adc	selfsha		;
@@ -178,14 +177,14 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 	adc	1+selfsha	;
 	sta	1+selfsha	;
 	dey			;
-	bne	-		;   selfsha += y * SCREENW;
+	bne	-		;
 +	txa			;
 	clc			;
 	adc	selfsha		;
 	sta	selfsha		;
 	lda	#0		;
 	adc	1+selfsha	;
-	sta	1+selfsha	;  selfsha += x;
+	sta	1+selfsha	;  selfsha = y * SCREENW + x;
 	clc			;
 	.if <+SCREEND
 	lda	selfsha		;
@@ -194,66 +193,81 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 	lda	1+selfsha	;
 	.endif
 	adc	#>+SCREEND	;
-	sta	1+selfcla	;  selfcla = 0xffff & (selfsha + SCREEND);
-	
-
-+	pla			; }
-	tax			; x = a; // card code, no mask (>= 8 "not card")
-	and	#$07		;
-	tay			; y = a & 0x07; // card code, masked onto 0 to 7
-	clc			;
-	adc	#$fc		; uint1_t c = (a & 0x04) ? 1 : 0; // bit 2 to c
-
-	lda	cardnum,y	; a = cardnum[y];
-	ldy	#0		;
-	jsr	selfsho		; selfsho(cardnum[y], y = 0); // 1 ~ 4, A ~ D
-	
-	bcc	+		;
-	lda	threatc,y	;
-	bcs	++		;
-+	lda	investc,y	;
-+	iny			;
-	jsr	selfsho		; selfsho(c ? threatc[0] : investc[0], y = 1);
-	
-	bcc	+		;
-	lda	threatc,y	;
-	bcs	++		;
-+	lda	investc,y	;
-+	iny			;
-	jsr	selfsho		; selfsho(c ? threatc[1] : investc[1], y = 2);
-	
-	lda	1+selfsha	;
-	cmp	#>ONLYTOP	;
-	bcs	cardtop		;
-	bne	+		;
+	sta	1+selfcla	;
+	.if !<+SCREEND		;
 	lda	selfsha		;
-	cmp	#<ONLYTOP	; if (selfsha >= ONLYTOP)
-	bcs	cardtop		;  goto cardtop; // only row, just finish color
-	
-+	ldy	#SCREENW*5	; for (y = SCREENW*5; y; ) {
--	tya			;
+	sta	selfcla		;  selfcla = 0xffff & (selfsha + SCREEND);
+	.endif
+
++	pla			; } // else skip the selfmod, using last value
+	tax			; x = a; // card code, no mask (>= 8 "not card")
+	clc			;
+	adc	#$f8		;
+	bcs	blankit		; if (a < 0x08) { // so can index into cardnum[]
+
+	and	#$07		;
+	tay			;  y = a & 0x07; // card code, masked onto 0 ~ 7
+	clc			;
+	adc	#$fc		;  uint1_t c = (a & 0x04) ? 1 : 0; // bit 2 to c
+
+	lda	cardnum,y	;  a = cardnum[y];
+	ldy	#0		;
+	jsr	selfsho		;  selfsho(cardnum[y], y = 0); // 1 ~ 4, A ~ D
+
+	bcc	+		;
+	lda	threatc,y	;
+	bcs	++		;
++	lda	investc,y	;
++	iny			;
+	jsr	selfsho		;  selfsho(c ? threatc[0] : investc[0], y = 1);
+
+	bcc	+		;
+	lda	threatc,y	;
+	bcs	++		;
++	lda	investc,y	;
++	iny			;
+	jsr	selfsho		;  selfsho(c ? threatc[1] : investc[1], y = 2);
+
+blankit	ldy	#0		; } // top of a bona fide card has been drawn
+	lda	1+selfsha	; y = 0;
+	cmp	#>ONLYTOP	;
+	bcs	+		;
+	bne	++		;
+	lda	selfsha		;
+	cmp	#<ONLYTOP	;
+	bcc	++		; if (selfsha >= ONLYTOP) {
++	cpx	#8		;  if (x >= 8)
+	bcs	cardtop		;   goto cardtop; // draw the blank card
+	ldy	#2		;  else
+	bcc	colrtop		;   goto colrtop; // only finish the color info
+
++	ldy	#SCREENW*5	; }
+-	tya			; for (y = SCREENW*5; y; ) {
 	sec			;
 	sbc	#SCREENW	;
-	tay			;  y -= SCREENW; // SCREENW*4 down to  0
-	lda	#$a0		;
+	tay			;  y -= SCREENW; // SCREENW*4 down to 0 (or *1!)
+	lda	#$a0		;  cardtop:
 	cpx	#8		;
 	bcc	+		;
-blankit	lda	#$20		;  a = (x<8) ? 0xa0 /*solid*/ : 0x20 /*blank*/;
+cardtop	lda	#$20		;  a = (x<8) ? 0xa0 /*solid*/ : 0x20 /*blank*/;
 +	jsr	selfsho		;  selfsho(a, y);
 	iny			;
 	jsr	selfsho		;  selfsho(a, ++y);
 	iny			;
 	jsr	selfsho		;  selfsho(a, ++y);
-cardtop	cpx	#8		;  cardtop:
-	bcs	cardout		;  if (x<8) {
-	lda	cardclr,x	;   a = cardclr[x];
+	cpx	#8		;
+	bcc	colrtop		;  if (x<8) {
+	cpy	#0		;
+	bne	-		;
+colrtop	lda	cardclr,x	;   a = cardclr[x];
 	jsr	selfclr		;   selfclr(a, y);
 	dey			;	
 	jsr	selfclr		;   selfclr(a, --y);
 	dey			;	
 	jsr	selfclr		;   selfclr(a, --y);
-	cpy	#0		;  }
-	bne	-		; }
+	beq	cardout		;   if (y == 0 || y <= SCREENW) break;
+	cpy	#SCREENW+1	;  }   // express exit, don't overwrite top    
+	bcc	cardout		; }
 cardout	rts			;} // cardsho()
 
 selfsho	.byte	$99		;static uint8_t* selfsha = SCREENM;
