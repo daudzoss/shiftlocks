@@ -171,11 +171,11 @@ main	lda	#0		;void main (void) {
 -	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
 	jsr	drw4hnd		; 
 	sta	HANDFOM		; HANDFOM = drw4hand(); // nonzero if we drew 4
-	
+
 ;	bne	+		;  if (HANDFOM)
 ;	jsr	drewall		;   break;
 ;	and	#$fc		;  if (drewall() >= 4) // also the new DECKREM
-	
+
 	bne	-		; if (HANDFOM == 0)
 	brk			;  break; // more than 44 cards in office?!?
 +	jsr	animhnd		; animhnd(); // draw empty deck pile after, if 0
@@ -386,6 +386,7 @@ drw1new	ldy	DECKREM		;int8_t drw1new(void) {
 
 drwhnyb	.text	$10,$20,$40,$80	;static const uint8_t drwhnyb[] = {16,32,64,128,
 	.text	$10,$20,$40,$80	;                                 16,32,64,128};
+drwlnyb	.text	$01,$02,$04,$08	;static const uint8_t drwlnyb[] = {1, 2, 4, 8};
 drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	bne	+++++++		; if (HANDREM == 0) { // should've emptied first
 	ldx	#4		;  uint8_t stack = 0; // return figure of merit
@@ -409,18 +410,14 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	brk			;     exit(1);
 	.text	1		;   } // a is a valid card in the range 0 ~ 7
 
-+	ldy	#0		;
-	sty	TEMPVAR		;
-	;and	#$07		;
++	;and	#$07		;
 	sta	HAND-1,x	;   HAND[x] = a /* & 0x07 */;
+	ldy	#0		;
+	sty	TEMPVAR		;
 	cmp	#4		;
 	bcc	+		;
-	txa			;
-	tay			;
-	sec			;
--	rol	TEMPVAR		;
-	dey			;
-	bne	-		;   TEMPVAR = (HAND[x] >= 4) ? 1<<x : 0; // ?T:I
+	lda	drwlnyb-1,x	;
+	sta	TEMPVAR		;   TEMPVAR = (HAND[x] >= 4) ? 1<<x : 0; // ?T:I
 
 +	pla			;   a = stack;
 	ora	TEMPVAR		;   a |= TEMPVAR; // low nybble updated
@@ -432,7 +429,7 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 +	lda	#0		;
 	pla			;
 	rts			;} // drw4hand()
-	
+
 drewall	rts			;
 animhnd	rts			;
 
