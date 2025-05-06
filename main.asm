@@ -25,51 +25,49 @@ COPIED2	= $0400
 	.text	$08,$93,$13,$13	; CHR$(8) CHR$(147) CHR$(19) CHR$(19)
 topline	.text	"the crime scene     "
 	.text	"  shiftlock's office"
-	.text   "                 "
-	.null	"draw",$22
+	.text	$22,$3a,$99,$3a
+	.null	$99,$3a,$99
 +	.word	(+), 2055
-	.text	$99,$3a,$99,$22
-	.text   "                 "
-	.null	"deck",$22
-+	.word	(+), 2055
+.if BASIC
 	.text	$99,$22
 	.text	"                 "
-.if BASIC
-	.null	"   ",$6e,$22
+	.null	$6e,$22
 .else
-	.null	"   /",$22
+	.text	$99,$3a,$99,$22
+	.text	"                 "
+	.null	"/",$22
 .endif
 +	.word	(+), 2055
 	.text	$99,$22
-	.text	"                 "
-	.null	$12,"   ",$92,$22
-+	.word	(+), 2055
-	.text	$99,$22
 	.text	"    threats      "
-	.null	$12,"   ",$92,$22
+	.null	"dis-",$22
 +	.word	(+), 2055
 	.text	$99,$22
 	.text	"                 "
-	.null	$12," ? ",$92,$22
+	.null	"card",$22
 +	.word	(+), 2055
 	.text	$99,$22
 	.text	" investigations  "
-	.null	$12,"   ",$92,$22
+	.null	$22
 +	.word	(+), 2055
 	.text	$99,$22
 	.text	"                 "
-	.null	$12,"   ",$92,$22
+	.null	"pile",$22,$3a,$99
 +	.word	(+), 2055
-	.text	$99,$3a,$99,$3a,$99
-	.text	$3a,$99,$3a,$99,$3a
+	.text	$99,$3a,$99,$22
+	.text	"                 "
+	.null	" draw",$22
++	.word	(+), 2055	
+	.text	$99,$3a,$99,$22
+	.text	"                 "
+	.null	" deck",$22
++	.word	(+), 2055
 	.text	$99,$22
 	.text	" ",$5e,"f1"
 	.text	" ",$5e,"f3"
 	.text	" ",$5e,"f5"
-	.null	" ",$5e,"f7",$22
-+	.word	(+), 2055
-	.text	$99,$22
-	.text	"                 "
+	.text	" ",$5e,"f7"
+	.text	"     "
 .if BASIC
 	.null	$6e,$22
 .else
@@ -77,16 +75,24 @@ topline	.text	"the crime scene     "
 .endif
 +	.word	(+), 2055
 	.text	$99,$22
-	.text	"                 "
-	.null	"dis-",$22
+	.text	"                  "
+	.null	$12,"   ",$92,$22
 +	.word	(+), 2055
 	.text	$99,$22
-	.text	"                 "
-	.null	"card",$22,$3a,$99
-+	.word	(+),2055
+	.text	"                  "
+	.null	$12,"   ",$92,$22
++	.word	(+), 2055
 	.text	$99,$22
-	.text	"                 "
-	.null	"pile",$22
+	.text	"                  "
+	.null	$12," ? ",$92,$22
++	.word	(+), 2055
+	.text	$99,$22
+	.text	"                  "
+	.null	$12,"   ",$92,$22
++	.word	(+), 2055
+	.text	$99,$22
+	.text	"                  "
+	.null	$12,"   ",$92,$22
 +	.word	(+),2055
 	.text	$99,$22
 	.text	" f2",$c0," f4",$c0
