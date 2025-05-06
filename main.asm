@@ -132,13 +132,26 @@ threatc	.text	$db,$c0
 cardclr	.text	$62,$63,$64,$65
 	.text	$66,$67,$68,$69
 	
-main
--	jsr	$ffe4
-	beq	-
-	ldx	#$08		;
+main	lda	#0		;
+-	pha			;
+	pha			;
+
+	asl			;
+	asl			;
+	clc			;
+	adc	#8		;
+	tax			;
+
+	pla			;
+	lsr			;
 	ldy	#$17		;
-	lda	#3		;
 	jsr	cardsho		;
+	
+	pla			;
+	clc			;
+	adc	#$01		;
+	and	#$07		;
+	bne	-		;
 -	jsr	$ffe4
 	beq	-
 	rts
@@ -155,10 +168,10 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 	bcc	+		;  if (y >= SCREENH - 1)
 	pla			;
 	jmp	cardout		;   return; // not allowed to draw even one line
-	tya			;
++	tya			;
 	beq	++		;  if (y > 0)
-+	lda	#SCREENW	;
-	;clc			;
+-	clc			;
+	lda	#SCREENW	;
 	adc	selfsha		;
 	sta	selfsha		;
 	lda	#0		;
@@ -174,40 +187,41 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 	adc	1+selfsha	;
 	sta	1+selfsha	;  selfsha += x;
 	clc			;
+	.if <+SCREEND
 	lda	selfsha		;
 	adc	#<+SCREEND	;
 	sta	selfcla		;
 	lda	1+selfsha	;
+	.endif
 	adc	#>+SCREEND	;
 	sta	1+selfcla	;  selfcla = 0xffff & (selfsha + SCREEND
 	
 
 +	pla			; }
-	clc			;
 	tax			; x = a; // card code, no mask (>= 8 "not card")
 	and	#$07		;
 	tay			; y = a & 0x07; // card code, masked onto 0 to 7
+	clc			;
 	adc	#$fc		; uint1_t c = (a & 0x04) ? 1 : 0; // bit 2 to c
 
 	lda	cardnum,y	; a = cardnum[y];
 	ldy	#0		;
-	jsr	selfsho		; selfsho(cardnum[y], 0); // 1 to 4,A to D (rvs)
+	jsr	selfsho		; selfsho(cardnum[y], y = 0); // 1 ~ 4, A ~ D
 	
 	bcc	+		;
 	lda	threatc,y	;
 	bcs	++		;
 +	lda	investc,y	;
 +	iny			;
-	jsr	selfsho		; selfsho(c ? threatc[0] : investc[0], 0);
+	jsr	selfsho		; selfsho(c ? threatc[0] : investc[0], y = 1);
 	
 	bcc	+		;
 	lda	threatc,y	;
 	bcs	++		;
 +	lda	investc,y	;
 +	iny			;
-	jsr	selfsho		; selfsho(c ? threatc[1] : investc[1], 1);
+	jsr	selfsho		; selfsho(c ? threatc[1] : investc[1], y = 2);
 	
-	iny			; y = 2;
 	lda	1+selfsha	;
 	cmp	#>ONLYTOP	;
 	bcs	cardtop		;
@@ -220,7 +234,7 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 -	tya			;
 	sec			;
 	sbc	#SCREENW	;
-	tay			;  y -= SCREENW;
+	tay			;  y -= SCREENW; // SCREENW*4 down to  0
 	lda	#$a0		;
 	cpx	#8		;
 	bcc	+		;
@@ -231,14 +245,14 @@ blankit	lda	#$20		;  a = (x<8) ? 0xa0 /*solid*/ : 0x20 /*blank*/;
 	iny			;
 	jsr	selfsho		;  selfsho(a, ++y);
 cardtop	cpx	#8		;  cardtop:
-	bcs	-		;  if (x<8) {
+	bcs	cardout		;  if (x<8) {
 	lda	cardclr,x	;   a = cardclr[x];
 	jsr	selfclr		;   selfclr(a, y);
 	dey			;	
 	jsr	selfclr		;   selfclr(a, --y);
 	dey			;	
 	jsr	selfclr		;   selfclr(a, --y);
-	cpy	#0		;  } else return;
+	cpy	#0		;  }
 	bne	-		; }
 cardout	rts			;} // cardsho()
 
