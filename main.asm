@@ -384,24 +384,24 @@ drw1new	ldy	DECKREM		;int8_t drw1new(void) {
 +	lda	#$ff		;  return -1;
 	rts			;} // drw1new()
 
+drwlnyb	.text	$01,$02,$04,$08	;static const uint8_t drwlnyb[] = {1, 2, 4, 8};
 drwhnyb	.text	$10,$20,$40,$80	;static const uint8_t drwhnyb[] = {16,32,64,128,
 	.text	$10,$20,$40,$80	;                                 16,32,64,128};
-drwlnyb	.text	$01,$02,$04,$08	;static const uint8_t drwlnyb[] = {1, 2, 4, 8};
 drw4hnd	lda	HANDREM		;void drw4hand(void) {
-	bne	+++++++		; if (HANDREM == 0) { // should've emptied first
-	ldx	#4		;  uint8_t stack = 0; // return figure of merit
+	bne	+++		; if (HANDREM == 0) { // should've emptied first
+	ldx	#4		;  uint8_t retval = 0; // return figure of merit
 -	pha			;  for (register uint8_t x = 3; x >= 0; x--) {
 	jsr	drw1new		;   register uint8_t a = drw1new();
-	bpl	+++++		;   if (a < 0) { // deck ran out
+	bpl	+		;   if (a < 0) { // deck ran out
 	txa			;
 	pha			;
-	ldx	DISCREM		;    register int8_t x = DISCREM;
-	stx	DECKREM		;
--	lda	DISCARD-1,x	;    for (DECKREM = x--; x >= 0 ; x--) {
-	sta	DECK-1,x	;     DECK[x] = DISCARD[x];
-	dex			;
+	ldy	DISCREM		;    register int8_t y = DISCREM;
+	sty	DECKREM		;
+-	lda	DISCARD-1,y	;    for (DECKREM = y--; y >= 0 ; y--) {
+	sta	DECK-1,y	;     DECK[y] = DISCARD[y];
+	dey			;
 	bne	-		;    }
-	stx	DISCREM		;    DISCREM = 0;
+	sty	DISCREM		;    DISCREM = 0;
 	jsr	shuffle		;    shuffle();
 	pla			;
 	tax			;
@@ -409,25 +409,18 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	bpl	+		;    if (a < 0) // all cards evaporated somehow?
 	brk			;     exit(1);
 	.text	1		;   } // a is a valid card in the range 0 ~ 7
-
 +	;and	#$07		;
 	sta	HAND-1,x	;   HAND[x] = a /* & 0x07 */;
-	ldy	#0		;
-	sty	TEMPVAR		;
-	cmp	#4		;
-	bcc	+		;
-	lda	drwlnyb-1,x	;
-	sta	TEMPVAR		;   TEMPVAR = (HAND[x] >= 4) ? 1<<x : 0; // ?T:I
-
-+	pla			;   a = stack;
-	ora	TEMPVAR		;   a |= TEMPVAR; // low nybble updated
-	ldy	HAND-1,x	;
-	ora	drwhnyb,y	;   a |= drwhnyb[HAND[x]]; // high nyb
-	dex			;  }
-	bne	---		; }
-
-+	lda	#0		;
+	tay			;
 	pla			;
+	cpy	#4		;
+	bcc	+		;   if (HAND[x] >= 4)//(HAND[x]>=4)?1<<x:0;//T:I
+	ora	drwlnyb-1,x	;    retval |= drwlnyb[x];
++	ora	drwhnyb,y	;   retval |= drwhnyb[HAND[x]]; // nybbles valid
+	dex			;  }
+	bne	--		;  return retval;
+	rts			; } else
++	lda	#0		;  return 0;
 	rts			;} // drw4hand()
 
 drewall	rts			;
