@@ -44,8 +44,8 @@ topline	.text	"the crime scene     "
 	.null	"dis-",$22
 +	.word	(+), 2055
 	.text	$99,$22
-	.text	"                 "
-	.null	"card",$22
+	.text	"   ",$12,"wounds: 0"
+	.null	$92,"     card",$22
 +	.word	(+), 2055
 	.text	$99,$22
 	.text	" investigations  "
@@ -55,11 +55,11 @@ topline	.text	"the crime scene     "
 	.text	"                 "
 	.null	"pile",$22,$3a,$99
 +	.word	(+), 2055
-	.text	$99,$3a,$99,$22
+	.text	$99,$22,$11
 	.text	"                 "
 	.null	" draw",$22
 +	.word	(+), 2055	
-	.text	$99,$3a,$99,$22
+	.text	$99,$22,$11
 	.text	"                 "
 	.null	" deck",$22
 +	.word	(+), 2055
@@ -98,7 +98,10 @@ topline	.text	"the crime scene     "
 	.text	$99,$22
 	.text	" f2",$c0," f4",$c0
 	.text	" f6",$c0," f8",$c0
-	.null	$22,$3a,$99
+	.text	" to solve: 3 col"
+	.text	" of  ",$c0,$77
+	.text	$9d,$9d,$9d,$94
+	.null	$34,$22,$3a,$99
 +	.word	(+),2055	
 	.text	$99,$22,"pairing "
 	.text	"   +       +    "
