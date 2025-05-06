@@ -116,10 +116,29 @@ SCREEND	= SCREENC-SCREENM
 SCRSIZE	= SCREENW*SCREENH
 ONLYTOP	= SCREENM+SCREENW*(SCREENH-8)
 
-stackht	= vararea + $0		; 0-3 invest, 4-7 threat, 8-11 office
-;????	= vararea + $0c
+DECKSIZ	= pstdeck-stddeck
+STACKHT	= vararea + $00		; 0-3 invest, 4-7 threat, 8-11 office
+HAND	= vararea + $0c		;
+DISCARD	= vararea + $10
+DECK	= DISCARD +DECKSIZ
+HANDREM = DISCARD +2*DECKSIZ	; should always be 0 or 4?
+DISCREM	= DISCARD +2*DECKSIZ+ 1
+DECKREM	= DISCARD + DECKSIZ + 2
+HANDFOM	= DISCARD + DECKSIZ + 3
+HANDGET	= DISCARD + DECKSIZ + 4
+;????	= DISCARD + DECKSIZ + 5
+TEMPVAR	= DISCARD + DECKSIZ + $f
 
 start
+
+stddeck	.text	$00,$00,$00,$00,$00,$00,$00,$00
+	.text	$01,$01,$01,$01,$01,$01,$01,$01
+	.text	$02,$02,$02,$02,$02,$02,$02,$02
+	.text	$03,$03,$03,$03,$03,$03,$03,$03
+	.text	$04,$04,$04,$04,$05,$05,$05,$05
+	.text	$06,$06,$06,$06,$07,$07,$07,$07
+pstdeck
+
 
 ;;; 1,2,3,4 = 000,001,010,011
 ;;; A,B,C,D = 100,101,110,111
@@ -131,31 +150,60 @@ investc	.text	$c0,$d7
 threatc	.text	$db,$c0
 cardclr	.text	$62,$63,$64,$65
 	.text	$66,$67,$68,$69
+drawx	.text	$11
+drawy	.text	$05
+discx	.text	$12
+discy	.text	$0b
+stackx	.text	$00,$04,$08,$0c
+	.text	$00,$04,$08,$0c	
+	.text	$16,$1b,$20,$25
+stacky	.text	9,9,9,9,1,1,1,1
+	.text	1,1,1,1		;bottom card of a stack allowed to grow up to...
+stacklm	.text	1,1,1,1,1,1,1,1
+	.text	$10,$10,$10,$10	;16 (alternating invest with threat or removals)
 
-main	lda	#0		;
--	pha			;
-	pha			;
+main	lda	#0		;void main (void) {
+	sta	DISCREM		;
+	sta	HANDREM		; DISCREM = HANDREM = 0;
+	jsr	finishr		; finishr(); // rule text completed using colors
+	jsr	initstk		; initstk();
+	lda	#DECKSIZ	;
+-	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
+	jsr	drw4hnd		; 
+	sta	HANDFOM		; HANDFOM = drw4hand(); // nonzero if we drew 4
+	
+;	bne	+		;  if (HANDFOM)
+;	jsr	drewall		;   break;
+;	and	#$fc		;  if (drewall() >= 4) // also the new DECKREM
+	
+	bne	-		; if (HANDFOM == 0)
+	brk			;  break; // more than 44 cards in office?!?
++	jsr	animhnd		; animhnd(); // draw empty deck pile after, if 0
 
+
+-	jsr	$ffe4		;
+	beq	-		; getchar();
+	rts			;} // main()
+
+finishr	lda	#0		;void finishr(void) {
+-	pha			; register uint8_t a, x, y;
+	pha			; for (a = 0; a < 8; a++) {
 	asl			;
 	asl			;
 	clc			;
 	adc	#8		;
-	tax			;
-
+	tax			;  x = 4 * a + 8; // cols 8, 12, ..., 36
 	pla			;
 	lsr			;
-	ldy	#$17		;
-	jsr	cardsho		;
-
+	ldy	#$17		;  y = 23;
+	jsr	cardsho		;  cardsho(a >> 2, x, y); // a = 1,1,2,2,3,3,4,4
 	pla			;
 	clc			;
 	adc	#$01		;
 	and	#$07		;
-	bne	-		;
--	jsr	$ffe4
-	beq	-
-	rts
-	
+	bne	-		; }
+	rts			;} // finishr()
+
 cardsho	pha			;void cardsho(register uint8_t& a,
 	cpx	#SCREENW	;              register uint8_t& x,
 	bcs	+++		;              register uint8_t& y) {
@@ -269,22 +317,126 @@ colrtop	lda	cardclr,x	;   a = cardclr[x];
 	cpy	#SCREENW+1	;  }   // express exit, don't overwrite top    
 	bcc	cardout		; }
 cardout	rts			;} // cardsho()
-
 selfsho	.byte	$99		;static uint8_t* selfsha = SCREENM;
 selfsha	.byte	<SCREENM	;void selfsho(uint8_t a, uint8_t y) {
 	.byte	>SCREENM	; selfsha[y] = a; // sta $XXXX,y
 	rts			;} // selfsho()
-
 selfclr	.byte	$99		;static uint8_t* selfclr = SCREENC;
 selfcla	.byte	<SCREENC	;void selfclr(uint8_t a, uint8_t y) {
 	.byte	>SCREENC	; selfcla[y] = a; // sta $XXXX,y
 	rts			;} // selfclr()
 
+initstk	lda	#$00		;void initstk(void) {
+	ldx	#$0c		; for (register uint8_t x = 11; x >= 0; x--)
+-	sta	STACKHT-1,x	;
+	dex			;  STACKHT[x] = 0;
+	bne	-		; }
+	rts			;} // initstk()
 
+shuffle	ldy	#$ff		;void shuffle(register uint8_t& a) {
+	tax			;
+	beq	shuffl1		; if (a > 0) { // # cards to copy from stddeck
+	sta	DECKREM		;  DECKREM = a;
+-	lda	stddeck-1,x	;  for (register int8_t x = a-1; x >= 0; x--) {
+	sta	DECK-1,x	;   DECK[x] = stddeck[x];
+	dex			;  }
+	bne	-		; }
+shuffl1	ldx	#$ff		; for (register uint8_t y = 255; y; y--) {
+shuffl2	txa			;  for (register uint8_t x = 255; x; x--) {
+	pha			;
+	tya			;   register uint8_t x, y; // local
+	pha			;
+	lda	RNDLOC1		;   for (x = (*RNDLOC1 ^ *RNDLOC2) >> 1;
+	eor	RNDLOC2		;        x >= *DECKREM;
+-	lsr			;        x >>= 1)
+	cmp	DECKREM		;
+	bcs	-		;    ; // x now a valid index into the deck
+	tax			;
+	lda	RNDLOC1		;   for (y = (*RNDLOC1 ^ *RNDLOC2) >> 1;
+	eor	RNDLOC2		;        y >= *DECKREM;
+-	lsr			;        y >>= 1)
+	cmp	DECKREM		;
+	bcs	-		;    ; // y now a valid index into the deck
+	tay			;
+	lda	DECK,x		;
+	pha			;   uint8_t temp = DECK[x];
+	lda	DECK,y		;
+	sta	DECK,x		;   DECK[x] = DECK[y];
+	pla			;
+	sta	DECK,y		;   DECK[y] = temp;
+	pla			;
+	tax			;
+	pla			;
+	tay			;
+	dey			;
+	bne	shuffl2		;  }
+	dex			;
+	bne	shuffl1		; }
+	rts			;} //shuffle()
 
+drw1new	ldy	DECKREM		;int8_t drw1new(void) {
+	dey			;
+	bmi	+		; if (DECKREM > 0 /* || DECKREM == -128*/ )
+	dey			;
+	sty	DECKREM		;
+	lda	DECK,y		;  return DECK[--DECKREM];
+	rts			; else
++	lda	#$ff		;  return -1;
+	rts			;} // drw1new()
 
+drwhnyb	.text	$10,$20,$40,$80	;static const uint8_t drwhnyb[] = {16,32,64,128,
+	.text	$10,$20,$40,$80	;                                 16,32,64,128};
+drw4hnd	lda	HANDREM		;void drw4hand(void) {
+	bne	+++++++		; if (HANDREM == 0) { // should've emptied first
+	ldx	#4		;  uint8_t stack = 0; // return figure of merit
+-	pha			;  for (register uint8_t x = 3; x >= 0; x--) {
+	jsr	drw1new		;   register uint8_t a = drw1new();
+	bpl	+++++		;   if (a < 0) { // deck ran out
+	txa			;
+	pha			;
+	ldx	DISCREM		;    register int8_t x = DISCREM;
+	stx	DECKREM		;
+-	lda	DISCARD-1,x	;    for (DECKREM = x--; x >= 0 ; x--) {
+	sta	DECK-1,x	;     DECK[x] = DISCARD[x];
+	dex			;
+	bne	-		;    }
+	stx	DISCREM		;    DISCREM = 0;
+	jsr	shuffle		;    shuffle();
+	pla			;
+	tax			;
+	jsr	drw1new		;    a = drw1new();
+	bpl	+		;    if (a < 0) // all cards evaporated somehow?
+	brk			;     exit(1);
+	.text	1		;   } // a is a valid card in the range 0 ~ 7
 
++	ldy	#0		;
+	sty	TEMPVAR		;
+	;and	#$07		;
+	sta	HAND-1,x	;   HAND[x] = a /* & 0x07 */;
+	cmp	#4		;
+	bcc	+		;
+	txa			;
+	tay			;
+	sec			;
+-	rol	TEMPVAR		;
+	dey			;
+	bne	-		;   TEMPVAR = (HAND[x] >= 4) ? 1<<x : 0; // ?T:I
 
-vararea
++	pla			;   a = stack;
+	ora	TEMPVAR		;   a |= TEMPVAR; // low nybble updated
+	ldy	HAND-1,x	;
+	ora	drwhnyb,y	;   a |= drwhnyb[HAND[x]]; // high nyb
+	dex			;  }
+	bne	---		; }
+
++	lda	#0		;
+	pla			;
+	rts			;} // drw4hand()
+	
+drewall	rts			;
+animhnd	rts			;
+
 pre_end
+.align	$40
+vararea
 .end
