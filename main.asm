@@ -333,29 +333,29 @@ initstk	lda	#$00		;void initstk(void) {
 	bne	-		; }
 	rts			;} // initstk()
 
-shuffle	ldy	#$ff		;void shuffle(register uint8_t& a) {
-	tax			;
+shuffle	ldx	#$ff		;void shuffle(register uint8_t& a) {
+	tay			;
 	beq	shuffl1		; if (a > 0) { // # cards to copy from stddeck
 	sta	DECKREM		;  DECKREM = a;
--	lda	stddeck-1,x	;  for (register int8_t x = a-1; x >= 0; x--) {
-	sta	DECK-1,x	;   DECK[x] = stddeck[x];
-	dex			;  }
+-	lda	stddeck-1,y	;  for (register int8_t y = a-1; y >= 0; y--) {
+	sta	DECK-1,y	;   DECK[y] = stddeck[y];
+	dey			;  }
 	bne	-		; }
-shuffl1	ldx	#$ff		; for (register uint8_t y = 255; y; y--) {
-shuffl2	txa			;  for (register uint8_t x = 255; x; x--) {
+shuffl1	ldy	#$ff		; for (register uint8_t x = 255; x; x--) {
+shuffl2	txa			;  for (register uint8_t y = 255; y; y--) {
 	pha			;
 	tya			;   register uint8_t x, y; // local
 	pha			;
 	lda	RNDLOC1		;   for (x = (*RNDLOC1 ^ *RNDLOC2) >> 1;
 	eor	RNDLOC2		;        x >= *DECKREM;
 -	lsr			;        x >>= 1)
-	cmp	DECKREM		;
+	cmp 	DECKREM		;
 	bcs	-		;    ; // x now a valid index into the deck
 	tax			;
 	lda	RNDLOC1		;   for (y = (*RNDLOC1 ^ *RNDLOC2) >> 1;
 	eor	RNDLOC2		;        y >= *DECKREM;
 -	lsr			;        y >>= 1)
-	cmp	DECKREM		;
+	cmp 	DECKREM		;
 	bcs	-		;    ; // y now a valid index into the deck
 	tay			;
 	lda	DECK,x		;
