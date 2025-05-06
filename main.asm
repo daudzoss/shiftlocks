@@ -404,7 +404,8 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	dex			;
 	bne	-		;    }
 	stx	DISCREM		;    DISCREM = 0;
-	jsr	shuffle		;    shuffle();
+	txa			;
+	jsr	shuffle		;    shuffle(0); // exists so don't copy stddeck
 	pla			;
 	tay			;
 	jsr	drw1new		;    a = drw1new();
