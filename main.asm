@@ -144,19 +144,19 @@ main
 	rts
 	
 	
-cardsho	pha			;
-	cpx	#SCREENW	;
-	bcs	++		; just skip the selfmod, use last value
-	lda	#<SCREENM	;
-	sta	selfsha		;
+cardsho	pha			;void cardsho(register uint8_t& a,
+	cpx	#SCREENW	;              register uint8_t& x,
+	bcs	++		;              register uint8_t& y) {
+	lda	#<SCREENM	; if (x < SCREENW) { // otherwise just skip the selfmod, use last value
+	sta	selfsha		; 
 	lda	#>SCREENM	;
-	sta	1+selfsha	;
-	tya			;
-	beq	+		;
+	sta	1+selfsha	;  selfsha = SCREENM;
 	cpy	#SCREENH-1	;
-	bcc	+		;
+	bcc	+		;  if (y >= SCREENH - 1)
 	pla			;
-	jmp	cardout		; return;
+	jmp	cardout		;   return; // not allowed to draw even one line
+	tya			;
+	beq	++		;  if (y > 0)
 +	lda	#SCREENW	;
 	;clc			;
 	adc	selfsha		;
@@ -165,90 +165,92 @@ cardsho	pha			;
 	adc	1+selfsha	;
 	sta	1+selfsha	;
 	dey			;
-	bne	-		;
+	bne	-		;   selfsha += y * SCREENW;
 +	txa			;
 	clc			;
 	adc	selfsha		;
 	sta	selfsha		;
 	lda	#0		;
 	adc	1+selfsha	;
-	sta	1+selfsha	;
+	sta	1+selfsha	;  selfsha += x;
 	clc			;
 	lda	selfsha		;
 	adc	#<+SCREEND	;
 	sta	selfcla		;
-	lda	1+selfcla	;
-	adc	#0		;
-	sta	1+selfcla	;
+	lda	1+selfsha	;
+	adc	#>+SCREEND	;
+	sta	1+selfcla	;  selfcla = 0xffff & (selfsha + SCREEND
 	
 
-+	pla			;
++	pla			; }
 	clc			;
-	adc	#$f8		; c = (a & 0x04) ? 1 : 0; // move bit 2 to carry
-	tax			;
-	and	#$07		; a &= 07;
-	tay			;
+	tax			; x = a; // card code, no mask (>= 8 "not card")
+	and	#$07		;
+	tay			; y = a & 0x07; // card code, masked onto 0 to 7
+	adc	#$fc		; uint1_t c = (a & 0x04) ? 1 : 0; // bit 2 to c
 
-	lda	cardnum,y	;
+	lda	cardnum,y	; a = cardnum[y];
 	ldy	#0		;
-	jsr	selfsho		;
+	jsr	selfsho		; selfsho(cardnum[y], 0); // 1 to 4,A to D (rvs)
 	
-	bcs	+		;
-	lda	investc,y	;
-	bcc	++		;
-+	lda	threatc,y	;
+	bcc	+		;
+	lda	threatc,y	;
+	bcs	++		;
++	lda	investc,y	;
 +	iny			;
-	jsr	selfsho		;
+	jsr	selfsho		; selfsho(c ? threatc[0] : investc[0], 0);
 	
-	bcs	+		;
-	lda	investc,y	;
-	bcc	++		;
-+	lda	threatc,y	;
+	bcc	+		;
+	lda	threatc,y	;
+	bcs	++		;
++	lda	investc,y	;
 +	iny			;
-	jsr	selfsho		;
+	jsr	selfsho		; selfsho(c ? threatc[1] : investc[1], 1);
 	
-	ldy	#2		;
+	iny			; y = 2;
 	lda	1+selfsha	;
 	cmp	#>ONLYTOP	;
 	bcs	cardtop		;
 	bne	+		;
 	lda	selfsha		;
-	cmp	#<ONLYTOP	;
-	bcs	cardtop		;
+	cmp	#<ONLYTOP	; if (selfsha >= ONLYTOP)
+	bcs	cardtop		;  goto cardtop; // only row, just finish color
 	
-+	ldy	#SCREENW*5	;
++	ldy	#SCREENW*5	; for (y = SCREENW*5; y; ) {
 -	tya			;
 	sec			;
 	sbc	#SCREENW	;
-	tay			;
+	tay			;  y -= SCREENW;
 	lda	#$a0		;
 	cpx	#8		;
 	bcc	+		;
-blankit	lda	#$20		;
-+	jsr	selfsho		;
+blankit	lda	#$20		;  a = (x<8) ? 0xa0 /*solid*/ : 0x20 /*blank*/;
++	jsr	selfsho		;  selfsho(a, y);
 	iny			;
-	jsr	selfsho		;
+	jsr	selfsho		;  selfsho(a, ++y);
 	iny			;
-	jsr	selfsho		;
-cardtop	lda	cardclr,x	;
-	jsr	selfclr		;
+	jsr	selfsho		;  selfsho(a, ++y);
+cardtop	cpx	#8		;  cardtop:
+	bcs	-		;  if (x<8) {
+	lda	cardclr,x	;   a = cardclr[x];
+	jsr	selfclr		;   selfclr(a, y);
 	dey			;	
-	jsr	selfclr		;
+	jsr	selfclr		;   selfclr(a, --y);
 	dey			;	
-	jsr	selfclr		;
-	cpy	#0		;
-	bne	-		;
-cardout	rts			;
+	jsr	selfclr		;   selfclr(a, --y);
+	cpy	#0		;  } else return;
+	bne	-		; }
+cardout	rts			;} // cardsho()
 
 selfsho	.byte	$99		;static uint8_t* selfsha = SCREENM;
 selfsha	.byte	<SCREENM	;void selfsho(uint8_t a, uint8_t y) {
 	.byte	>SCREENM	; selfsha[y] = a; // sta $XXXX,y
 	rts			;} // selfsho()
 
-selfclr	.byte	$99		;
-selfcla	.byte	<SCREENC	;
-	.byte	>SCREENC	;
-	rts			;
+selfclr	.byte	$99		;static uint8_t* selfclr = SCREENC;
+selfcla	.byte	<SCREENC	;void selfclr(uint8_t a, uint8_t y) {
+	.byte	>SCREENC	; selfcla[y] = a; // sta $XXXX,y
+	rts			;} // selfclr()
 
 
 
