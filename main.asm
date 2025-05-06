@@ -123,11 +123,12 @@ DISCARD	= vararea + $10
 DECK	= DISCARD +DECKSIZ
 HANDREM = DISCARD +2*DECKSIZ	; should always be 0 or 4?
 DISCREM	= DISCARD +2*DECKSIZ+ 1
-DECKREM	= DISCARD + DECKSIZ + 2
-HANDFOM	= DISCARD + DECKSIZ + 3
-HANDGET	= DISCARD + DECKSIZ + 4
-;????	= DISCARD + DECKSIZ + 5
-TEMPVAR	= DISCARD + DECKSIZ + $f
+DECKREM	= DISCARD +2*DECKSIZ+ 2
+NWOUNDS	= DISCARD +2*DECKSIZ+ 3
+HANDGET	= DISCARD +2*DECKSIZ+ 4?
+HANDFOM	= DISCARD +2*DECKSIZ+ 5?
+;????	= DISCARD +2*DECKSIZ+ 6
+TEMPVAR	= DISCARD +2*DECKSIZ+ $f
 
 start
 
@@ -150,6 +151,8 @@ investc	.text	$c0,$d7
 threatc	.text	$db,$c0
 cardclr	.text	$62,$63,$64,$65
 	.text	$66,$67,$68,$69
+woundsx	.text	$0b
+woundsy	.text	$07
 drawx	.text	$11
 drawy	.text	$05
 discx	.text	$12
@@ -164,7 +167,8 @@ stacklm	.text	1,1,1,1,1,1,1,1
 
 main	lda	#0		;void main (void) {
 	sta	DISCREM		;
-	sta	HANDREM		; DISCREM = HANDREM = 0;
+	sta	HANDREM		;
+	sta	NWOUNDS		; NWOUNDS = DISCREM = HANDREM = 0;
 	jsr	finishr		; finishr(); // rule text completed using colors
 	jsr	initstk		; initstk();
 	lda	#DECKSIZ	;
@@ -422,6 +426,19 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	rts			; } else
 +	lda	#0		;  return 0;
 	rts			;} // drw4hand()
+
+redrwok	pha			;uint8_t redrwok(register uint8_t& a) {
+	and	#$0f		;
+	beq	+		;
+	eor	#$0f		;
+	beq	+		;
+	pla			;
+	lsr			;
+	lsr			;
+	lsr			;
+	lsr			;
++	lda	#1		; 
+	rts			;} // redrwok())
 
 drewall	rts			;
 animhnd	rts			;
