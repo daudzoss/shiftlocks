@@ -195,14 +195,16 @@ newhand	jsr	drw4hnd		; do {
 	.text	$1		;
 +	jsr	animhnd		;  animhnd(); // draw empty deck pile after if 0
 	lda	HANDFOM		;
-	jsr	redrwok		; if (redrwok(HANDFOM)) {
-	jsr	animrej		;  animrej(
-
--	jsr	$ffe4		; }
+	jsr	redrwok		;
+	;bne	+		;
+	jsr	animrej		;
+	bne	newhand		; } while (/*redrwok(HANDFOM) &&*/ animrej());
++
+-	jsr	$ffe4		;
 	beq	-		; getchar();
- lda #0
- sta DECKREM
- jmp drawsho
+	lda 	#0		;
+	sta 	DECKREM		; DECKREM = 0;
+	jmp 	drawsho		; drawsho(); // pretend draw deck just ran OUT
 	rts			;} // main()
 
 finishr	lda	#0		;void finishr(void) {
@@ -300,7 +302,7 @@ cardsho	php			;void cardsho(uint1_t& c, register uint8_t& a,
 +	iny			;
 	jsr	selfsho		;  selfsho(c ? threatc[1] : investc[1], y = 2);
 	ldy	#0		; } // top of any bona fide card has been drawn
-	
+
 blankit	plp			; y = 0;
 	bcs	+		; if (c || // caller explicitly requested a top
 	lda	1+selfsha	;
@@ -531,7 +533,10 @@ drawsho	ldx	drawx		;void drawsho(void) {
 	rts			;} // drawsho()
 
 discsho	rts
-animrej rts
+
+animrej lda	#1
+	rts
+
 pre_end
 .align	$40
 vararea
