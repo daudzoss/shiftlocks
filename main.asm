@@ -195,6 +195,9 @@ main	lda	#0		;void main (void) {
 	lda 	#DECKSIZ	;
 	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
 newhand	jsr	drw4hnd		; do {
+ bne +	
+ brk
+ +
 	sta	HANDFOM		;  HANDFOM = drw4hand(); // nonzero if we drew 4
 	bne	+		;  if (HANDFOM == 0)
 	brk			;   exit(1); // more than 44 cards in office?!?
@@ -206,8 +209,6 @@ newhand	jsr	drw4hnd		; do {
 	jsr	animrej		;
 	beq	newhand		; } while (/*redrwok(HANDFOM) &&*/ animrej());
 +
- brk
- brk	
 	lda 	#0		;
 	sta 	DECKREM		; DECKREM = 0;
 	jsr 	drawsho		; drawsho(); // pretend draw deck just ran OUT
@@ -512,7 +513,7 @@ animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 	clc			;
 	pla			;
 	ldy	inhandy ;-1,x	;
-	jsr	cardsho		;   cardsho(0, a, inhandx[a], inhandy/*[a]*/);
+	jsr	cardsho		;   cardsho(0, a, inhandx[a], inhandy[a]);
 	pla			;  }
 	tax			;// }
 	dex			; drawsho();
@@ -588,8 +589,11 @@ setzptr	.macro	p,m,ym=0,x=1,y=1;inline void setzptr(uint1_t p, void const* m,
 txtclip	.macro	buf,p=0,ini=1	;inline void txtclip(char* buf, uint8_t x,
 	.if (\ini)		;                    uint8_t y, uint8_t a) {
 	setzptr	\p,SCREENM,SCREENW; setzptr(p,SCREENM,SCREENW,x,y);
+	 .if (\buf)
 	setzptr	\p+1,\buf,0,0,0	;  setzptr(p+1,buf,0,0,0);
+	 .endif
 	.endif			;
+	.if (\buf)
 	tay			; static void* zp[];
 	beq	+		; register uint8_t a, y;
 -	dey			; y = a;
@@ -598,6 +602,7 @@ txtclip	.macro	buf,p=0,ini=1	;inline void txtclip(char* buf, uint8_t x,
 	cpy	#0		; y = 0;
 	bne	-		; // a indeterminate, x and y both 0, z set
 +
+	.endif			;
 	.endm			;} // txtclip()
 
 replace	.macro	newstr,p=0,ini=1;inline void replace(char* newstr, uint8_t a) {
@@ -620,10 +625,8 @@ handmsg	.macro s1s2,s1l,s2l,bck=0;inline void handmsg(uint8_t* s1s2,uint8_t s1l,
 	ldy	inhandy		;
 	dey			; y = inhandy[0] - 2;
 	dey			;// 17 characters centered within row above hand
-	.if (\bck)
 	lda	#\s1l		; a = s1l; // length of string 1
 	txtclip	\bck		; txtclip(bck /*backing store*/, x, y, a);
-	.endif
 	lda	#\s1l		; a = s1l; // length of string 1
 	replace	\s1s2		; replace(s1s2); // show s1
 	ldy	inhandy		;
@@ -632,10 +635,8 @@ handmsg	.macro s1s2,s1l,s2l,bck=0;inline void handmsg(uint8_t* s1s2,uint8_t s1l,
 	dex			;// 15 characters centered within row below hand
 	bne	-		; y = inhandy[0] + 6;
 	ldx	inhandx		; x = inhandx[0];
-	.if (\bck)
 	lda	#\s2l		; a = s2l; // length of string 2 imm. following
 	txtclip	\bck+\s1l	; txtclip(x, y, a, SCRATCH + CLP1SZ);
-	.endif
 	lda	#\s2l		; a = s2l; // length of string 2 imm. following
 	replace	\s1s2+\s1l	; replace(rejmsg0);
 	.endm			;} // handmsg()
@@ -651,8 +652,8 @@ animrej				;uint1_t animrej(void) {
 	handmsg	SCRATCH,rejmsg1-rejmsg0,rejmsg2-rejmsg1
 	
 	plp			;
-	php			;
 	bne	+		;
+	php			;
 	ldx	#4		;
 	ldy	DISCREM		;
 -	lda	HAND-1,x	;
@@ -668,12 +669,9 @@ animrej				;uint1_t animrej(void) {
 	clc			;
 	jsr	cardsho		;
 	
-+	plp			;
-	pla			; return a == 'Y' || a == 'y';
-- jsr $ffe4
- beq -
- brk
- brk	
+	jsr	animhnd		;
+	plp			;
++	pla			; return a == 'Y' || a == 'y';
 	rts			;} // animrej()
 rejmsg0	.byte	$04,$09,$13,$03	; DISC
 	.byte	$01,$12,$04,$20	; ARD 
