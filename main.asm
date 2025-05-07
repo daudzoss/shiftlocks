@@ -154,9 +154,14 @@ investc	.text	$c0,$d7
 threatc	.text	$db,$c0
 pileout	.text	$4f,$77,$50
 	.text	$65,$0f,$67
-	.text	$65,$55,$67
-	.text	$65,$54,$67
+	.text	$65,$15,$67
+	.text	$65,$14,$67
 	.text	$4c,$6f,$7a
+cardofs	.text	0*SCREENW+0,0*SCREENW+1,0*SCREENW+2
+	.text	1*SCREENW+0,1*SCREENW+1,1*SCREENW+2
+	.text	2*SCREENW+0,2*SCREENW+1,2*SCREENW+2
+	.text	3*SCREENW+0,3*SCREENW+1,3*SCREENW+2
+	.text	4*SCREENW+0,4*SCREENW+1,4*SCREENW+2
 cardclr	.text	$66,$63,$64,$65
 	.text	$32,$3a,$58,$69
 woundsx	.text	$0b
@@ -191,10 +196,13 @@ newhand	jsr	drw4hnd		; do {
 +	jsr	animhnd		;  animhnd(); // draw empty deck pile after if 0
 	lda	HANDFOM		;
 	jsr	redrwok		; if (redrwok(HANDFOM)) {
-	jsr	animrej		;
+	jsr	animrej		;  animrej(
 
--	jsr	$ffe4		;
+-	jsr	$ffe4		; }
 	beq	-		; getchar();
+ lda #0
+ sta DECKREM
+ jmp drawsho
 	rts			;} // main()
 
 finishr	lda	#0		;void finishr(void) {
@@ -245,22 +253,24 @@ cardsho	php			;void cardsho(uint1_t& c, register uint8_t& a,
 	clc			;
 	adc	selfsha		;
 	sta	selfsha		;
+	sta	ZP		;
 	lda	#0		;
 	adc	1+selfsha	;
 	sta	1+selfsha	;  selfsha = y * SCREENW + x; // card's top left
+	sta	1+ZP		;  zp = selfsha; // for drawsho()
 	clc			;
-	.if <+SCREEND
-	lda	selfsha		;
-	adc	#<+SCREEND	;
-	sta	selfcla		;
-	lda	1+selfsha	;
-	.endif
+;	.if <+SCREEND
+;	lda	selfsha		;
+;	adc	#<+SCREEND	;
+;	sta	selfcla		;
+;	lda	1+selfsha	;
+;	.endif
 	adc	#>+SCREEND	;
 	sta	1+selfcla	;
-	.if !<+SCREEND		;
+;	.if !<+SCREEND		;
 	lda	selfsha		;
 	sta	selfcla		;  selfcla = 0xffff & (selfsha + SCREEND);
-	.endif
+;	.endif
 
 +	pla			; } // else skip selfmod, using previous address
 	tax			; x = a; // card code, no mask (>= 8 "not card")
@@ -345,11 +355,11 @@ colrtop	lda	cardclr,x	;   a = cardclr[x];
 	cpy	#SCREENW;+1	;  }   // express exit, don't overwrite top    
 	bcs	-		; }
 cardout	rts			;} // cardsho()
-selfsho	.byte	$99		;static uint8_t* selfsha = SCREENM;
+selfsho	.byte	$99	; sta,y	;static uint8_t* selfsha = SCREENM;
 selfsha	.byte	<SCREENM	;void selfsho(uint8_t a, uint8_t y) {
 	.byte	>SCREENM	; selfsha[y] = a; // sta $XXXX,y
 	rts			;} // selfsho()
-selfclr	.byte	$99		;static uint8_t* selfclr = SCREENC;
+selfclr	.byte	$99	; sta,y	;static uint8_t* selfclr = SCREENC;
 selfcla	.byte	<SCREENC	;void selfclr(uint8_t a, uint8_t y) {
 	.byte	>SCREENC	; selfcla[y] = a; // sta $XXXX,y
 	rts			;} // selfclr()
@@ -481,8 +491,8 @@ redrwok	sta	TEMPVAR		;uint8_t redrwok(register uint8_t& a) {
 +	rts			;} // redrwok()
 
 animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
-	beq	+		; if (HANDREM) {
--	txa			;  for (register int8_t x = 3; x >= 0; x--) {
+	beq	drawsho		; if (HANDREM) {
+-	txa			;  for (register int8_t x = HANDREM; x>=0; x--){
 	pha			;
 	lda	HAND-1,x	;   register int8_t a = HAND[x];
 	pha			;
@@ -496,16 +506,27 @@ animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 	tax			; }
 	dex			; drawsho();
 	bne	-		;} // animhnd()
-drawsho	ldx	DECKREM		;void drawsho(void) {
-	beq	++		; if  (DECKREM) {
+drawsho	ldx	drawx		;void drawsho(void) {
+	ldy	drawy		; x = drawx;
+	lda	DECKREM		; y = drawy;
+	beq	+		; if  (DECKREM) {
 	clc			;
-	lda	#REVCARD	;
-	ldx	drawx		;
-	ldy	drawy		;
+	lda	#REVCARD	;  // draw a cardback
+	jsr	cardsho		;  cardsho(0,a = REVCARD, x = drawx, y = drawy);
+	;; FIXME: need to re-draw the center question mark
+	rts
++	clc			; } else {
+	lda	#NONCARD	;  // clear the space a card previously occupied
 	jsr	cardsho		;  cardsho(0,a = NONCARD, x = drawx, y = drawy);
-+	rts			; } else {
-	
-+	rts			;} // discsho()
+	ldx	#cardofs-pileout;  // cardsho() sets zp pointing to the top left
+-	lda	cardofs-1,x	;  for (int8_t x = 14; x > 0; x--) {
+	tay			;
+	lda	pileout-1,x	;
+	sta	(zp),y		;   zp[cardofs[x]] = pileout[x];
+	dex			;  }
+	bne	-		; }
+	rts			;} // drawsho()
+
 discsho	rts
 animrej rts
 pre_end
