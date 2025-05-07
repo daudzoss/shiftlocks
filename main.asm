@@ -204,10 +204,10 @@ newhand	jsr	drw4hnd		; do {
 	jsr	redrwok		;
    ;   	bne	+		;
 	jsr	animrej		;
-	bne	newhand		; } while (/*redrwok(HANDFOM) &&*/ animrej());
+	beq	newhand		; } while (/*redrwok(HANDFOM) &&*/ animrej());
 +
--	jsr	$ffe4		;
-	beq	-		; getchar();
+ brk
+ brk	
 	lda 	#0		;
 	sta 	DECKREM		; DECKREM = 0;
 	jsr 	drawsho		; drawsho(); // pretend draw deck just ran OUT
@@ -502,7 +502,7 @@ redrwok	sta	TEMPVAR		;uint8_t redrwok(register uint8_t& a) {
 +	rts			;} // redrwok()
 
 animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
-	beq	drawsho		; if (HANDREM) {
+	;beq	drawsho		;// if (HANDREM) {
 -	txa			;  for (register int8_t x = HANDREM; x>=0; x--){
 	pha			;
 	lda	HAND-1,x	;   register int8_t a = HAND[x];
@@ -514,7 +514,7 @@ animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 	ldy	inhandy ;-1,x	;
 	jsr	cardsho		;   cardsho(0, a, inhandx[a], inhandy/*[a]*/);
 	pla			;  }
-	tax			; }
+	tax			;// }
 	dex			; drawsho();
 	bne	-		;} // animhnd()
 drawsho	ldx	drawx		;void drawsho(void) {
@@ -614,40 +614,76 @@ replace	.macro	newstr,p=0,ini=1;inline void replace(char* newstr, uint8_t a) {
 +
 	.endm			;} // replace()
 
-RCLP0SZ	= rejmsg1-rejmsg0
-RCLP1SZ	= rejmsg2-rejmsg1
-animrej ldx	inhandx		;uint8_t animrej(void) {
+handmsg	.macro s1s2,s1l,s2l,bck=0;inline void handmsg(uint8_t* s1s2,uint8_t s1l,
+	ldx	inhandx		;                     uint8_t s2l,uint8_t* bck){
 	dex			; x = inhandx[0] - 1;
-	ldy	inhandy		; y = inhandy[0] - 1;
+	ldy	inhandy		;
+	dey			; y = inhandy[0] - 2;
 	dey			;// 17 characters centered within row above hand
-	lda	#RCLP0SZ	; a = rejmsg1 - rejmsg0;
-	txtclip	SCRATCH		; txtclip(SCRATCH, x, y, a);
-	lda	#RCLP0SZ	; a = rejmsg1 - rejmsg0;
-	replace	rejmsg0		; replace(rejmsg0);
+	.if (\bck)
+	lda	#\s1l		; a = s1l; // length of string 1
+	txtclip	\bck		; txtclip(bck /*backing store*/, x, y, a);
+	.endif
+	lda	#\s1l		; a = s1l; // length of string 1
+	replace	\s1s2		; replace(s1s2); // show s1
 	ldy	inhandy		;
 	ldx	#6		;
 -	iny			;
 	dex			;// 15 characters centered within row below hand
 	bne	-		; y = inhandy[0] + 6;
 	ldx	inhandx		; x = inhandx[0];
-	lda	#RCLP1SZ	; a = rejmsg2 - rejmsg1;
-	txtclip	SCRATCH+RCLP0SZ	; txtclip(x, y, a, SCRATCH + CLP1SZ);
-	lda	#RCLP1SZ	; a = rejmsg2 - rejmsg1;
-	replace	rejmsg1		; replace(rejmsg0);
+	.if (\bck)
+	lda	#\s2l		; a = s2l; // length of string 2 imm. following
+	txtclip	\bck+\s1l	; txtclip(x, y, a, SCRATCH + CLP1SZ);
+	.endif
+	lda	#\s2l		; a = s2l; // length of string 2 imm. following
+	replace	\s1s2+\s1l	; replace(rejmsg0);
+	.endm			;} // handmsg()
 
-;	replace	SCRATCH		;
-;	replace	SCRATCH+RCLP0SZ	;
+animrej				;uint1_t animrej(void) {
+	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
+-	jsr	$ffe4		;
+	beq	-		;
+	and	#$ef		;
+	cmp	#$59		;
+	pha			;
+	php			;
+	handmsg	SCRATCH,rejmsg1-rejmsg0,rejmsg2-rejmsg1
+	
+	plp			;
+	php			;
+	bne	+		;
+	ldx	#4		;
+	ldy	DISCREM		;
+-	lda	HAND-1,x	;
+	sta	DISCARD,y	;
+	iny			;
+	dex			;
+	bne	-		;
+	stx	HANDREM		;
+	sty	DISCREM		;
 
+	ldx	discx		;
+	ldy	discy		;
+	clc			;
+	jsr	cardsho		;
+	
++	plp			;
+	pla			; return a == 'Y' || a == 'y';
+- jsr $ffe4
+ beq -
+ brk
+ brk	
 	rts			;} // animrej()
 rejmsg0	.byte	$04,$09,$13,$03	; DISC
 	.byte	$01,$12,$04,$20	; ARD 
 	.byte	$26,$20,$12,$05	; & RE
 	.byte	$04,$12,$01,$17	; DRAW
 	.byte	$3f		; ?
-rejmsg1	.byte	$10,$12,$05,$13	; PRES
-	.byte	$13,$20,$19,$20	; S Y 
-	.byte	$06,$0f,$12,$20	; FOR
-	.byte	$19,$05,$13	; YES
+rejmsg1	.byte	$90,$92,$85,$93	; PRES
+	.byte	$93,$a0,$99,$a0	; S Y 
+	.byte	$86,$8f,$92,$a0	; FOR
+	.byte	$99,$85,$93	; YES
 rejmsg2	
 
 pre_end
