@@ -208,7 +208,8 @@ finishr	lda	#0		;void finishr(void) {
 	pla			;
 	lsr			;
 	ldy	#$17		;  y = 23;
-	jsr	cardsho		;  cardsho(a >> 2, x, y); // a = 1,1,2,2,3,3,4,4
+ 	sec			;
+	jsr	cardsho		;  cardsho(1, a >> 2, x, y); //a=1,1,2,2,3,3,4,4
 	pla			;
 	clc			;
 	adc	#$01		;
@@ -216,15 +217,17 @@ finishr	lda	#0		;void finishr(void) {
 	bne	-		; }
 	rts			;} // finishr()
 
-cardsho	pha			;void cardsho(register uint8_t& a,
-	cpx	#SCREENW	;              register uint8_t& x,
-	bcs	+++		;              register uint8_t& y) {
-	lda	#<SCREENM	; if (x < SCREENW) { // x >= SCREENW is special
+cardsho	php			;void cardsho(uint1_t& c, register uint8_t& a,
+	pha			;             register uint8_t& x,
+	cpx	#SCREENW	;             register uint8_t& y) {
+	bcs	+++		; if (x < SCREENW) { // x >= SCREENW is special
+	lda	#<SCREENM	;
 	sta	selfsha		; 
 	lda	#>SCREENM	;
 	sta	1+selfsha	;  selfsha = SCREENM;
 	cpy	#SCREENH-1	;
 	bcc	+		;  if (y >= SCREENH - 1)
+	pla			;
 	pla			;
 	jmp	cardout		;   return; // not allowed to draw below screen
 +	tya			;
@@ -288,14 +291,16 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 	jsr	selfsho		;  selfsho(c ? threatc[1] : investc[1], y = 2);
 	ldy	#0		; } // top of any bona fide card has been drawn
 	
-blankit	lda	1+selfsha	; y = 0;
+blankit	plp			; y = 0;
+	bcs	+		; if (c || // caller explicitly requested a top
+	lda	1+selfsha	;
 	cmp	#1+>ONLYTOP	;
 	bcs	+		;
 	cmp	#>ONLYTOP	;
 	bne	++		;
 	lda	selfsha		;
 	cmp	#<ONLYTOP	;
-	bcc	++		; if (selfsha >= ONLYTOP) { // on bottom 8 rows
+	bcc	++		;     (selfsha >= ONLYTOP)) { //in bottom 8 rows
 +	cpx	#8		;  if (x >= 8)
 	bcs	cardtop		;   goto cardtop; // draw the blank card
 	ldy	#2		;  else
@@ -483,19 +488,21 @@ animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 	pha			;
 	lda	inhandx-1,x	;
 	tax			;
+	clc			;
 	pla			;
 	ldy	inhandy ;-1,x	;
-	jsr	cardsho		;   cardsho(a, inhandx[a], inhandy/*[a]*/);
+	jsr	cardsho		;   cardsho(0, a, inhandx[a], inhandy/*[a]*/);
 	pla			;  }
 	tax			; }
 	dex			; drawsho();
 	bne	-		;} // animhnd()
 drawsho	ldx	DECKREM		;void drawsho(void) {
 	beq	++		; if  (DECKREM) {
+	clc			;
 	lda	#REVCARD	;
 	ldx	drawx		;
 	ldy	drawy		;
-	jsr	cardsho		;  cardsho(a = NONCARD, x = drawx, y = drawy);
+	jsr	cardsho		;  cardsho(0,a = NONCARD, x = drawx, y = drawy);
 +	rts			; } else {
 	
 +	rts			;} // discsho()
