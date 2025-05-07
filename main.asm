@@ -556,59 +556,59 @@ cardout	clc			;void cardout(register uint8_t& x,
 setzptr	.macro	p,m,ym=0,x=1,y=1;inline void setzptr(uint1_t p, void const* m,
 	pha			;           uint16_t ym, uint8_t x, uint8_t y) {
 	lda	#<\m		; static void* zp[];
-	sta	ZP+2*\p		;
+	sta	ZP+\p+\p	;
 	lda	#>\m		;
-	sta	1+ZP+2*\p	; zp[p] = (void*) m + ym * y + x;
-.if \y
+	sta	1+ZP+\p+\p	; zp[p] = (void*) m + ym * y + x;
+.if (\y)
 	cpy	#0		;
 	beq	+		;
 -	clc			;
-	lda	ZP+2*\p		;
+	lda	ZP+\p+\p	;
 	adc	#<\ym		;
-	sta	ZP+2*\p		;
-	lda	1+ZP+2*\p	;
+	sta	ZP+\p+\p	;
+	lda	1+ZP+\p+\p	;
 	adc	#>\ym		;
-	sta	1+ZP+2*\p	;
+	sta	1+ZP+\p+\p	;
 	dey			;
 	bne	-		;
 +				;
 .endif
-.if \x
+.if (\x)
 	txa			;
 	clc			;
-	adc	ZP+2*\p		;
-	sta	ZP+2*\p		;
-	lda	1+ZP+2*\p	;
+	adc	ZP+\p+\p	;
+	sta	ZP+\p+\p	;
+	lda	1+ZP+\p+\p	;
 	adc	#0		;
-	sta	1+ZP+2*\p	;
+	sta	1+ZP+\p+\p	;
 .endif
 	pla			; // x and y both 0, a restored (sr accordingly)
 	.endm			;} // setzptr()
 
 txtclip	.macro	buf,p=0,ini=1	;inline void txtclip(char* buf, uint8_t x,
-	.if \ini		;                    uint8_t y, uint8_t a) {
+	.if (\ini)		;                    uint8_t y, uint8_t a) {
 	setzptr	\p,SCREENM,SCREENW; setzptr(p,SCREENM,SCREENW,x,y);
 	setzptr	\p+1,\buf,0,0,0	;  setzptr(p+1,buf,0,0,0);
 	.endif			;
 	tay			; static void* zp[];
 	beq	+		; register uint8_t a, y;
 -	dey			; y = a;
-	lda	(ZP+2*\p),y	; while (y--) 
-	sta	(ZP+2*\p+2),y	;  *(zp[p+1] + y) = a = *(zp[p] + y);
+	lda	(ZP+\p+\p),y	; while (y--) 
+	sta	(ZP+\p+\p+2),y	;  *(zp[p+1] + y) = a = *(zp[p] + y);
 	cpy	#0		; y = 0;
 	bne	-		; // a indeterminate, x and y both 0, z set
 +
 	.endm			;} // txtclip()
 
 replace	.macro	newstr,p=0,ini=1;inline void replace(char* newstr, uint8_t a) {
-	.if \ini
+	.if (\ini)
 	setzptr	\p+1,\newstr,0,0,0; setzptr(p+1,newstr,0,0,0);
 	.endif
 	tay			; static void* zp[];
 	beq	+		; register uint8_t a, y;
 -	dey			; y = a;
-	lda	(ZP+2*\p+2),y	; while (y--)
-	sta	(ZP+2*\p),y	;  *(zp[p] + y) = a = *(zp[p+1] + y);
+	lda	(ZP+\p+\p+2),y	; while (y--)
+	sta	(ZP+\p+\p),y	;  *(zp[p] + y) = a = *(zp[p+1] + y);
 	cpy	#0		; y = 0
 	bne	-		; // a indeterminate, x and y both 0, z set
 +
@@ -639,8 +639,15 @@ animrej ldx	inhandx		;uint8_t animrej(void) {
 ;	replace	SCRATCH+RCLP0SZ	;
 
 	rts			;} // animrej()
-rejmsg0	.text	"discard & redraw?"
-rejmsg1	.text	 "press y for yes"
+rejmsg0	.byte	$04,$09,$13,$03	; DISC
+	.byte	$01,$12,$04,$20	; ARD 
+	.byte	$26,$20,$12,$05	; & RE
+	.byte	$04,$12,$01,$17	; DRAW
+	.byte	$3f		; ?
+rejmsg1	.byte	$10,$12,$05,$13	; PRES
+	.byte	$13,$20,$19,$20	; S Y 
+	.byte	$06,$0f,$12,$20	; FOR
+	.byte	$19,$05,$13	; YES
 rejmsg2	
 
 pre_end
