@@ -280,8 +280,9 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 
 blankit	ldy	#0		; } // top of a bona fide card has been drawn
 	lda	1+selfsha	; y = 0;
-	cmp	#>ONLYTOP	;
+	cmp	#1+>ONLYTOP	;
 	bcs	+		;
+	cmp	#>ONLYTOP	;
 	bne	++		;
 	lda	selfsha		;
 	cmp	#<ONLYTOP	;
