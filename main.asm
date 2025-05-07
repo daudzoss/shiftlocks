@@ -321,14 +321,17 @@ blankit	plp			; y = 0;
 	sec			;
 	sbc	#SCREENW	;
 	tay			;  y -= SCREENW; // SCREENW*4 down to 0 (or *1?)
-	bne	+		;
-	cpx	#9;8		;
-	bcs	+		;  if (y == 0 && x < 8) {
-	iny			;
-	iny			;   y = 2;
-	bne	colrtop		;  } else { // drawing card body or a blank top
+	bne	+		;  if (y == 0) {
+	cpx	#NONCARD	; 
+	bcs	+		;   if (x < 8 || x == REVCARD) {
+	iny			;    y = 2;
+	iny			;    if (x == REVCARD) goto colrto2;
+	lda	#0		;    
+	cpx	#REVCARD	;    else goto colrtop;
+	beq	colrto2		;   }
+	bne	colrtop		;  }
 +	lda	#$a0		;
-	cpx	#9;8		;
+	cpx	#9;8		;  // drawing card body or a blank top
 	bcc	+		;  cardtop:
 cardtop	lda	#$20		;   a = (x<8) ? 0xa0 /*solid*/ : 0x20 /*blank*/;
 +	jsr	selfsho		;   selfsho(a, y);
@@ -341,11 +344,11 @@ cardtop	lda	#$20		;   a = (x<8) ? 0xa0 /*solid*/ : 0x20 /*blank*/;
 ;	cpy	#0		;  if (x<8) { // only apply color to non-erasure
 ;	bne	-		;
 ;	beq	cardout		;  colrtop:
- lda #0
- cpx #8
- beq +
+	lda	 #0		;
+	cpx	 #8		;
+	beq	colrto2		;
 colrtop	lda	cardclr,x	;   a = cardclr[x];
-+	jsr	selfclr		;   selfclr(a, y);
+colrto2	jsr	selfclr		;   selfclr(a, y);
 	dey			;	
 	jsr	selfclr		;   selfclr(a, --y);
 	dey			;	
