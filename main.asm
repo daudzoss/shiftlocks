@@ -117,21 +117,27 @@ SCRSIZE	= SCREENW*SCREENH
 REVCARD = $08
 NONCARD	= $ff
 ONLYTOP	= SCREENM+SCREENW*(SCREENH-8)
-
 DECKSIZ	= pstdeck-stddeck
-STACKHT	= vararea + $00		; 0-3 invest, 4-7 threat, 8-11 office
-HAND	= vararea + $0c		;
-DISCARD	= vararea + $10
-DECK	= DISCARD +DECKSIZ
-HANDREM = DISCARD +2*DECKSIZ	; should always be 0 or 4?
-DISCREM	= DISCARD +2*DECKSIZ+ 1
-DECKREM	= DISCARD +2*DECKSIZ+ 2
-NWOUNDS	= DISCARD +2*DECKSIZ+ 3
-HANDHST	= DISCARD +2*DECKSIZ+ 4
-HANDGET	= DISCARD +2*DECKSIZ+ $c;?
-HANDFOM	= DISCARD +2*DECKSIZ+ $d;?
-;????	= DISCARD +2*DECKSIZ+ $e?
-TEMPVAR	= DISCARD +2*DECKSIZ+ $f
+
+UNDOABL	= vararea
+STACKHT	= UNDOABL + $00		; 0-3 invest, 4-7 threat, 8-11 office
+HAND	= UNDOABL + $0c		;
+DISCARD	= UNDOABL + $10
+DECK	= DISCARD + DECKSIZ
+UNDOABH	= DISCARD + 2*DECKSIZ	; should always be 0 or 4?
+HANDREM = UNDOABH + 0
+DISCREM	= UNDOABH + 1
+DECKREM	= UNDOABH + 2
+NWOUNDS	= UNDOABH + 3
+HANDHST	= UNDOABH + 4
+HANDGET	= UNDOABH + $c;?
+HANDFOM	= UNDOABH + $d;?
+;????	= UNDOABH + $e?
+;????	= UNDOABH + $f
+
+UNSAVED	= vararea + $100
+TEMPVAR	= UNSAVED + $0
+SCRATCH	= UNSAVED + $1
 
 start
 
@@ -196,7 +202,7 @@ newhand	jsr	drw4hnd		; do {
 +	jsr	animhnd		;  animhnd(); // draw empty deck pile after if 0
 	lda	HANDFOM		;
 	jsr	redrwok		;
-	;bne	+		;
+   ;   	bne	+		;
 	jsr	animrej		;
 	bne	newhand		; } while (/*redrwok(HANDFOM) &&*/ animrej());
 +
@@ -204,7 +210,7 @@ newhand	jsr	drw4hnd		; do {
 	beq	-		; getchar();
 	lda 	#0		;
 	sta 	DECKREM		; DECKREM = 0;
-	jmp 	drawsho		; drawsho(); // pretend draw deck just ran OUT
+	jsr 	drawsho		; drawsho(); // pretend draw deck just ran OUT
 	rts			;} // main()
 
 finishr	lda	#0		;void finishr(void) {
@@ -239,7 +245,7 @@ cardsho	php			;void cardsho(uint1_t& c, register uint8_t& a,
 	bcc	+		;  if (y >= SCREENH - 1)
 	pla			;
 	pla			;
-	jmp	cardout		;   return; // not allowed to draw below screen
+	jmp	cardrts		;   return; // not allowed to draw below screen
 +	tya			;
 	beq	+		;
 -	clc			;
@@ -345,7 +351,7 @@ cardtop	lda	#$20		;   a = (x<8) ? 0xa0 /*solid*/ : 0x20 /*blank*/;
 ;	bcc	colrtop		;
 ;	cpy	#0		;  if (x<8) { // only apply color to non-erasure
 ;	bne	-		;
-;	beq	cardout		;  colrtop:
+;	beq	cardrts		;  colrtop:
 	lda	 #0		;
 	cpx	 #8		;
 	beq	colrto2		;
@@ -356,10 +362,10 @@ colrto2	jsr	selfclr		;   selfclr(a, y);
 	dey			;	
 	jsr	selfclr		;   selfclr(a, --y);
 	;cpy	#0
-	beq	cardout		;   if (y == 0 || y <= SCREENW) break;
+	beq	cardrts		;   if (y == 0 || y <= SCREENW) break;
 	cpy	#SCREENW;+1	;  }   // express exit, don't overwrite top    
 	bcs	-		; }
-cardout	rts			;} // cardsho()
+cardrts	rts			;} // cardsho()
 selfsho	.byte	$99	; sta,y	;static uint8_t* selfsha = SCREENM;
 selfsha	.byte	<SCREENM	;void selfsho(uint8_t a, uint8_t y) {
 	.byte	>SCREENM	; selfsha[y] = a; // sta $XXXX,y
@@ -512,27 +518,40 @@ animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 	dex			; drawsho();
 	bne	-		;} // animhnd()
 drawsho	ldx	drawx		;void drawsho(void) {
-	ldy	drawy		; x = drawx;
-	lda	DECKREM		; y = drawy;
-	beq	+		; if  (DECKREM) {
+	ldy	drawy		;
+	lda	DECKREM		;
+	beq	+		; if  (DECKREM)
 	clc			;
-	lda	#REVCARD	;  // draw a cardback
+	lda	#REVCARD	;  // draw just the blank card back
 	jsr	cardsho		;  cardsho(0,a = REVCARD, x = drawx, y = drawy);
 	;; FIXME: need to re-draw the center question mark
-	rts
-+	clc			; } else {
-	lda	#NONCARD	;  // clear the space a card previously occupied
-	jsr	cardsho		;  cardsho(0,a = NONCARD, x = drawx, y = drawy);
-	ldx	#cardofs-pileout;  // cardsho() sets zp pointing to the top left
--	lda	cardofs-1,x	;  for (int8_t x = 14; x > 0; x--) {
-	tay			;
-	lda	pileout-1,x	;
-	sta	(zp),y		;   zp[cardofs[x]] = pileout[x];
-	dex			;  }
-	bne	-		; }
+	rts			; else
++	jsr	cardout		;  cardout(x = drawx, y = drawy);
 	rts			;} // drawsho()
 
-discsho	rts
+discsho	ldx	discx		;void discsho(void) {
+	ldy	DISCREM		;
+	beq	+		; if (DISCREM) {
+	tay			; 
+	lda	DISCARD-1,y	;
+	ldy	discy		;
+	clc			;  cardsho(0, a = DISCARD[DISCREM-1],
+	jsr	cardsho		;          x = discx, y = discy);
+	rts			; } else
++	jsr	cardout		;  cardout(x = discx,  y = discy);
+	rts			;} // discsho()
+
+cardout	clc			;void cardout(register uint8_t& x,
+	lda	#NONCARD	;             register uint8_t& y) { // clear it:
+	jsr	cardsho		; cardsho(0,a = NONCARD, x = drawx, y = drawy);
+	ldx	#cardofs-pileout; // cardsho() left zp pointing to the top left
+-	lda	cardofs-1,x	; for (int8_t x = 3*5 - 1; x > 0; x--) {
+	tay			;
+	lda	pileout-1,x	;
+	sta	(zp),y		;  zp[cardofs[x]] = pileout[x];
+	dex			;
+	bne	-		; }
+	rts			;} // cardout()
 
 animrej lda	#1
 	rts
