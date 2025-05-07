@@ -157,8 +157,8 @@ pileout	.text	$4f,$77,$50
 	.text	$65,$55,$67
 	.text	$65,$54,$67
 	.text	$4c,$6f,$7a
-cardclr	.text	$62,$63,$64,$65
-	.text	$66,$67,$68,$69
+cardclr	.text	$66,$63,$64,$65
+	.text	$32,$3a,$58,$69
 woundsx	.text	$0b
 woundsy	.text	$07
 drawx	.text	$12
