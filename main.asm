@@ -114,6 +114,8 @@ topline	.text	"the crime scene     "
 
 SCREEND	= SCREENC-SCREENM
 SCRSIZE	= SCREENW*SCREENH
+REVCARD = $08
+NONCARD	= $ff
 ONLYTOP	= SCREENM+SCREENW*(SCREENH-8)
 
 DECKSIZ	= pstdeck-stddeck
@@ -150,14 +152,19 @@ threat0	.text	$81,$82,$83,$84
 cardtyp
 investc	.text	$c0,$d7
 threatc	.text	$db,$c0
+pileout	.text	$4f,$77,$50
+	.text	$65,$0f,$67
+	.text	$65,$55,$67
+	.text	$65,$54,$67
+	.text	$4c,$6f,$7a
 cardclr	.text	$62,$63,$64,$65
 	.text	$66,$67,$68,$69
 woundsx	.text	$0b
 woundsy	.text	$07
-drawx	.text	$11
-drawy	.text	$05
+drawx	.text	$12
+drawy	.text	$10
 discx	.text	$12
-discy	.text	$0b
+discy	.text	$00
 inhandx	.text	$01,$05,$09,$0d
 inhandy	.text	$10;,$10,$10,$10
 stackx	.text	$00,$04,$08,$0c
@@ -174,14 +181,17 @@ main	lda	#0		;void main (void) {
 	sta	NWOUNDS		; NWOUNDS = DISCREM = HANDREM = 0;
 	jsr	finishr		; finishr(); // rule text completed using colors
 	jsr	initstk		; initstk();
-	lda	#DECKSIZ	;
+	lda 	#DECKSIZ	;
 	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
-	jsr	drw4hnd		; 
-	sta	HANDFOM		; HANDFOM = drw4hand(); // nonzero if we drew 4
-	bne	+		; if (HANDFOM == 0)
-	brk			;  exit(1); // more than 44 cards in office?!?
+newhand	jsr	drw4hnd		; do {
+	sta	HANDFOM		;  HANDFOM = drw4hand(); // nonzero if we drew 4
+	bne	+		;  if (HANDFOM == 0)
+	brk			;   exit(1); // more than 44 cards in office?!?
 	.text	$1		;
-+	jsr	animhnd		; animhnd(); // draw empty deck pile after, if 0
++	jsr	animhnd		;  animhnd(); // draw empty deck pile after if 0
+	lda	HANDFOM		;
+	jsr	redrwok		; if (redrwok(HANDFOM)) {
+	jsr	animrej		;
 
 -	jsr	$ffe4		;
 	beq	-		; getchar();
@@ -297,27 +307,30 @@ blankit	lda	1+selfsha	; y = 0;
 	sbc	#SCREENW	;
 	tay			;  y -= SCREENW; // SCREENW*4 down to 0 (or *1?)
 	bne	+		;
-	cpx	#8		;
+	cpx	#9;8		;
 	bcs	+		;  if (y == 0 && x < 8) {
 	iny			;
 	iny			;   y = 2;
 	bne	colrtop		;  } else { // drawing card body or a blank top
-+	lda	#$a0		;  cardtop:
-	cpx	#8		;
-	bcc	+		;
++	lda	#$a0		;
+	cpx	#9;8		;
+	bcc	+		;  cardtop:
 cardtop	lda	#$20		;   a = (x<8) ? 0xa0 /*solid*/ : 0x20 /*blank*/;
 +	jsr	selfsho		;   selfsho(a, y);
 	iny			;
 	jsr	selfsho		;   selfsho(a, ++y);
 	iny			;
 	jsr	selfsho		;   selfsho(a, ++y);
-	cpx	#8		;  }
-	bcc	colrtop		;
-	cpy	#0		;  if (x<8) { // only apply color to non-erasure
-	bne	-		;
-	beq	cardout		;  colrtop:
+;	cpx	#8		;  }
+;	bcc	colrtop		;
+;	cpy	#0		;  if (x<8) { // only apply color to non-erasure
+;	bne	-		;
+;	beq	cardout		;  colrtop:
+ lda #0
+ cpx #8
+ beq +
 colrtop	lda	cardclr,x	;   a = cardclr[x];
-	jsr	selfclr		;   selfclr(a, y);
++	jsr	selfclr		;   selfclr(a, y);
 	dey			;	
 	jsr	selfclr		;   selfclr(a, --y);
 	dey			;	
@@ -430,7 +443,7 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	ora	drwflag,x	;   retval |= drwflag[a]];
 	dey			;  }
 	bne	--		;
-	tax			;  return retval; // Z will be clear
+	tax			;  return retval; // Z should be clear (nonzero)
 	rts			; } else
 +	lda	#0		;  return 0; // Z will be set
 	rts			;} // drw4hand()
@@ -473,12 +486,21 @@ animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 	pla			;
 	ldy	inhandy ;-1,x	;
 	jsr	cardsho		;   cardsho(a, inhandx[a], inhandy/*[a]*/);
-	pla			;
-	tax			;
-	dex			;  }
-	bne	-		; }
-+	rts			;} // animhnd()
-
+	pla			;  }
+	tax			; }
+	dex			; drawsho();
+	bne	-		;} // animhnd()
+drawsho	ldx	DECKREM		;void drawsho(void) {
+	beq	++		; if  (DECKREM) {
+	lda	#REVCARD	;
+	ldx	drawx		;
+	ldy	drawy		;
+	jsr	cardsho		;  cardsho(a = NONCARD, x = drawx, y = drawy);
++	rts			; } else {
+	
++	rts			;} // discsho()
+discsho	rts
+animrej rts
 pre_end
 .align	$40
 vararea
