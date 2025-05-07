@@ -209,10 +209,7 @@ newhand	jsr	drw4hnd		; do {
 	jsr	animrej		;
 	beq	newhand		; } while (/*redrwok(HANDFOM) &&*/ animrej());
 +
-	lda 	#0		;
-	sta 	DECKREM		; DECKREM = 0;
-	jsr 	drawsho		; drawsho(); // pretend draw deck just ran OUT
-	rts			;} // main()
+ 	rts			;} // main()
 
 finishr	lda	#0		;void finishr(void) {
 -	pha			; register uint8_t a, x, y;
@@ -503,7 +500,7 @@ redrwok	sta	TEMPVAR		;uint8_t redrwok(register uint8_t& a) {
 +	rts			;} // redrwok()
 
 animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
-	;beq	drawsho		;// if (HANDREM) {
+	beq	drawsho		; if (HANDREM) {
 -	txa			;  for (register int8_t x = HANDREM; x>=0; x--){
 	pha			;
 	lda	HAND-1,x	;   register int8_t a = HAND[x];
@@ -515,7 +512,7 @@ animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 	ldy	inhandy ;-1,x	;
 	jsr	cardsho		;   cardsho(0, a, inhandx[a], inhandy[a]);
 	pla			;  }
-	tax			;// }
+	tax			; }
 	dex			; drawsho();
 	bne	-		;} // animhnd()
 drawsho	ldx	drawx		;void drawsho(void) {
@@ -645,33 +642,45 @@ animrej				;uint1_t animrej(void) {
 	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
 -	jsr	$ffe4		;
 	beq	-		;
-	and	#$ef		;
+	and	#$df		;
 	cmp	#$59		;
-	pha			;
 	php			;
 	handmsg	SCRATCH,rejmsg1-rejmsg0,rejmsg2-rejmsg1
 	
 	plp			;
+	php
 	bne	+		;
-	php			;
+	
 	ldx	#4		;
 	ldy	DISCREM		;
 -	lda	HAND-1,x	;
 	sta	DISCARD,y	;
+	lda	#NONCARD	;
+	sta	HAND-1,x	;
+	
+	txa			;
+	pha			;
+	tya			;
+	pha			;
+
+	ldx	discx		;
+	ldy	discy		;
+	clc			;
+	jsr	cardsho		;
+	jsr	animhnd		;
+
+	pla			;
+	tay			;
+	pla			;
+	tax			;
+	
 	iny			;
 	dex			;
 	bne	-		;
 	stx	HANDREM		;
 	sty	DISCREM		;
 
-	ldx	discx		;
-	ldy	discy		;
-	clc			;
-	jsr	cardsho		;
-	
-	jsr	animhnd		;
-	plp			;
-+	pla			; return a == 'Y' || a == 'y';
++	plp			; return a == 'Y' || a == 'y';
 	rts			;} // animrej()
 rejmsg0	.byte	$04,$09,$13,$03	; DISC
 	.byte	$01,$12,$04,$20	; ARD 
