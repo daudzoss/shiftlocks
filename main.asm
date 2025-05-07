@@ -209,14 +209,14 @@ finishr	lda	#0		;void finishr(void) {
 cardsho	pha			;void cardsho(register uint8_t& a,
 	cpx	#SCREENW	;              register uint8_t& x,
 	bcs	+++		;              register uint8_t& y) {
-	lda	#<SCREENM	; if (x < SCREENW) {
+	lda	#<SCREENM	; if (x < SCREENW) { // x >= SCREENW is special
 	sta	selfsha		; 
 	lda	#>SCREENM	;
 	sta	1+selfsha	;  selfsha = SCREENM;
 	cpy	#SCREENH-1	;
 	bcc	+		;  if (y >= SCREENH - 1)
 	pla			;
-	jmp	cardout		;   return; // not allowed to draw even one line
+	jmp	cardout		;   return; // not allowed to draw below screen
 +	tya			;
 	beq	+		;
 -	clc			;
@@ -234,7 +234,7 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 	sta	selfsha		;
 	lda	#0		;
 	adc	1+selfsha	;
-	sta	1+selfsha	;  selfsha = y * SCREENW + x;
+	sta	1+selfsha	;  selfsha = y * SCREENW + x; // card's top left
 	clc			;
 	.if <+SCREEND
 	lda	selfsha		;
@@ -249,11 +249,10 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 	sta	selfcla		;  selfcla = 0xffff & (selfsha + SCREEND);
 	.endif
 
-+	pla			; } // else skip the selfmod, using last value
++	pla			; } // else skip selfmod, using previous address
 	tax			; x = a; // card code, no mask (>= 8 "not card")
-	clc			;
-	adc	#$f8		;
-	bcs	blankit		; if (a < 0x08) { // so can index into cardnum[]
+	cmp	#$08		;
+	bcs	blankit		; if (a < 0x08) { // cards 0 ~ 7 index cardnum[]
 
 	and	#$07		;
 	tay			;  y = a & 0x07; // card code, masked onto 0 ~ 7
@@ -277,16 +276,16 @@ cardsho	pha			;void cardsho(register uint8_t& a,
 +	lda	investc,y	;
 +	iny			;
 	jsr	selfsho		;  selfsho(c ? threatc[1] : investc[1], y = 2);
-
-blankit	ldy	#0		; } // top of a bona fide card has been drawn
-	lda	1+selfsha	; y = 0;
+	ldy	#0		; } // top of any bona fide card has been drawn
+	
+blankit	lda	1+selfsha	; y = 0;
 	cmp	#1+>ONLYTOP	;
 	bcs	+		;
 	cmp	#>ONLYTOP	;
 	bne	++		;
 	lda	selfsha		;
 	cmp	#<ONLYTOP	;
-	bcc	++		; if (selfsha >= ONLYTOP) {
+	bcc	++		; if (selfsha >= ONLYTOP) { // on bottom 8 rows
 +	cpx	#8		;  if (x >= 8)
 	bcs	cardtop		;   goto cardtop; // draw the blank card
 	ldy	#2		;  else
@@ -296,29 +295,37 @@ blankit	ldy	#0		; } // top of a bona fide card has been drawn
 -	tya			; for (y = SCREENW*5; y; ) {
 	sec			;
 	sbc	#SCREENW	;
-	tay			;  y -= SCREENW; // SCREENW*4 down to 0 (or *1!)
-	lda	#$a0		;  cardtop:
+	tay			;  y -= SCREENW; // SCREENW*4 down to 0 (or *1?)
+	bne	+		;
+	cpx	#8		;
+	bcs	+		;  if (y == 0 && x < 8) {
+	iny			;
+	iny			;   y = 2;
+	bne	colrtop		;  } else { // drawing card body or a blank top
++	lda	#$a0		;  cardtop:
 	cpx	#8		;
 	bcc	+		;
-cardtop	lda	#$20		;  a = (x<8) ? 0xa0 /*solid*/ : 0x20 /*blank*/;
-+	jsr	selfsho		;  selfsho(a, y);
+cardtop	lda	#$20		;   a = (x<8) ? 0xa0 /*solid*/ : 0x20 /*blank*/;
++	jsr	selfsho		;   selfsho(a, y);
 	iny			;
-	jsr	selfsho		;  selfsho(a, ++y);
+	jsr	selfsho		;   selfsho(a, ++y);
 	iny			;
-	jsr	selfsho		;  selfsho(a, ++y);
-	cpx	#8		;
-	bcc	colrtop		;  if (x<8) {
-	cpy	#0		;
+	jsr	selfsho		;   selfsho(a, ++y);
+	cpx	#8		;  }
+	bcc	colrtop		;
+	cpy	#0		;  if (x<8) { // only apply color to non-erasure
 	bne	-		;
+	beq	cardout		;  colrtop:
 colrtop	lda	cardclr,x	;   a = cardclr[x];
 	jsr	selfclr		;   selfclr(a, y);
 	dey			;	
 	jsr	selfclr		;   selfclr(a, --y);
 	dey			;	
 	jsr	selfclr		;   selfclr(a, --y);
+	;cpy	#0
 	beq	cardout		;   if (y == 0 || y <= SCREENW) break;
-	cpy	#SCREENW+1	;  }   // express exit, don't overwrite top    
-	bcc	cardout		; }
+	cpy	#SCREENW;+1	;  }   // express exit, don't overwrite top    
+	bcs	-		; }
 cardout	rts			;} // cardsho()
 selfsho	.byte	$99		;static uint8_t* selfsha = SCREENM;
 selfsha	.byte	<SCREENM	;void selfsho(uint8_t a, uint8_t y) {
