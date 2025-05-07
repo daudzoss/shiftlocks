@@ -553,10 +553,99 @@ cardout	clc			;void cardout(register uint8_t& x,
 	bne	-		; }
 	rts			;} // cardout()
 
-animrej lda	#1
-	rts
+setzptr	.macro	p,m,ym=0,x=1,y=1;inline void setzptr(uint1_t p, void const* m,
+	pha			;           uint16_t ym, uint8_t x, uint8_t y) {
+	lda	#<\m		; static void* zp[];
+	sta	ZP+2*\p		;
+	lda	#>\m		;
+	sta	1+ZP+2*\p	; zp[p] = (void*) m + ym * y + x;
+.if \y
+	cpy	#0		;
+	beq	+		;
+-	clc			;
+	lda	ZP+2*\p		;
+	adc	#<\ym		;
+	sta	ZP+2*\p		;
+	lda	1+ZP+2*\p	;
+	adc	#>\ym		;
+	sta	1+ZP+2*\p	;
+	dey			;
+	bne	-		;
++				;
+.endif
+.if \x
+	txa			;
+	clc			;
+	adc	ZP+2*\p		;
+	sta	ZP+2*\p		;
+	lda	1+ZP+2*\p	;
+	adc	#0		;
+	sta	1+ZP+2*\p	;
+.endif
+	pla			; // x and y both 0, a restored (sr accordingly)
+	.endm			;} // setzptr()
+
+txtclip	.macro	buf,p=0,ini=1	;inline void txtclip(char* buf, uint8_t x,
+	.if \ini		;                    uint8_t y, uint8_t a) {
+	setzptr	\p,SCREENM,SCREENW; setzptr(p,SCREENM,SCREENW,x,y);
+	setzptr	\p+1,\buf,0,0,0	;  setzptr(p+1,buf,0,0,0);
+	.endif			;
+	tay			; static void* zp[];
+	beq	+		; register uint8_t a, y;
+-	dey			; y = a;
+	lda	(ZP+2*\p),y	; while (y--) 
+	sta	(ZP+2*\p+2),y	;  *(zp[p+1] + y) = a = *(zp[p] + y);
+	cpy	#0		; y = 0;
+	bne	-		; // a indeterminate, x and y both 0, z set
++
+	.endm			;} // txtclip()
+
+replace	.macro	newstr,p=0,ini=1;inline void replace(char* newstr, uint8_t a) {
+	.if \ini
+	setzptr	\p+1,\newstr,0,0,0; setzptr(p+1,newstr,0,0,0);
+	.endif
+	tay			; static void* zp[];
+	beq	+		; register uint8_t a, y;
+-	dey			; y = a;
+	lda	(ZP+2*\p+2),y	; while (y--)
+	sta	(ZP+2*\p),y	;  *(zp[p] + y) = a = *(zp[p+1] + y);
+	cpy	#0		; y = 0
+	bne	-		; // a indeterminate, x and y both 0, z set
++
+	.endm			;} // replace()
+
+RCLP0SZ	= rejmsg1-rejmsg0
+RCLP1SZ	= rejmsg2-rejmsg1
+animrej ldx	inhandx		;uint8_t animrej(void) {
+	dex			; x = inhandx[0] - 1;
+	ldy	inhandy		; y = inhandy[0] - 1;
+	dey			;// 17 characters centered within row above hand
+	lda	#RCLP0SZ	; a = rejmsg1 - rejmsg0;
+	txtclip	SCRATCH		; txtclip(SCRATCH, x, y, a);
+	lda	#RCLP0SZ	; a = rejmsg1 - rejmsg0;
+	replace	rejmsg0		; replace(rejmsg0);
+	ldy	inhandy		;
+	ldx	#6		;
+-	iny			;
+	dex			;// 15 characters centered within row below hand
+	bne	-		; y = inhandy[0] + 6;
+	ldx	inhandx		; x = inhandx[0];
+	lda	#RCLP1SZ	; a = rejmsg2 - rejmsg1;
+	txtclip	SCRATCH+RCLP0SZ	; txtclip(x, y, a, SCRATCH + CLP1SZ);
+	lda	#RCLP1SZ	; a = rejmsg2 - rejmsg1;
+	replace	rejmsg1		; replace(rejmsg0);
+
+;	replace	SCRATCH		;
+;	replace	SCRATCH+RCLP0SZ	;
+
+	rts			;} // animrej()
+rejmsg0	.text	"discard & redraw?"
+rejmsg1	.text	 "press y for yes"
+rejmsg2	
 
 pre_end
-.align	$40
+.align	$80
 vararea
+.align	$100	
+undobuf
 .end
