@@ -198,6 +198,20 @@ main	lda	#0		;void main (void) {
 	jsr	initstk		; initstk();
 	lda 	#DECKSIZ	;
 	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
+	ldx	#$ff		;
+-	txa			;
+	pha			; for (register uint8_t a = 255; a; a--) {
+	lda	#0		;
+	jsr	shuffle		;  shuffle(0);
+	lda	DECK		;
+	ldx	drawx		;
+	ldy	drawy		;
+	clc			;
+	jsr	cardsho		;  cardsho(0, DECK[0], drawx, drawy);
+	pla			;
+	tax			;
+	dex			;
+	bne	-		; }
 newhand	jsr	drw4hnd		; do {
 	sta	HANDFOM		;  HANDFOM = drw4hand(); // nonzero if we drew 4
 	bne	+		;  if (HANDFOM == 0)
@@ -573,46 +587,41 @@ cardout	clc			;void cardout(register uint8_t& x,
 
 animrej				;uint1_t animrej(void) {
 	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
--	jsr	$ffe4		;
-	beq	-		;
-	and	#$df		;
-	cmp	#$59		;
-	php			;
+-	jsr	$ffe4		; handmsg("DISCARD & REDRAW?"/*RVS ON*/
+	beq	-		;          "PRESS Y FOR YES"/*RVS OFF*/, 17, 15
+	and	#$df		;         SCRATCH);
+	cmp	#$59		; register uint8_t a = getchar();
+	php			; handmsg(SCRATCH, 17, 15); // pop backing store
 	handmsg	SCRATCH,rejmsg1-rejmsg0,rejmsg2-rejmsg1
-	
 	plp			;
 	php
-	bne	+		;
-	
+	bne	+		; if (a == 'Y' || a == 'y') {
 	ldx	#4		;
-	ldy	DISCREM		;
--	lda	HAND-1,x	;
-	sta	DISCARD,y	;
+	ldy	DISCREM		;  register uint8_t y = DISCREM;
+-	lda	HAND-1,x	;  for (register int8_t& x = 3; x >= 0; x--) {
+	sta	DISCARD,y	;   DISCARD[y] = HAND[x];
 	lda	#NONCARD	;
-	sta	HAND-1,x	;
-	
+	sta	HAND-1,x	;   HAND[x] = 0xff; // blank a 3x5 rectangle...
 	txa			;
 	pha			;
 	tya			;
 	pha			;
-
+	lda	#NONCARD	;
 	ldx	discx		;
 	ldy	discy		;
 	clc			;
-	jsr	cardsho		;
-	jsr	animhnd		;
-
+	jsr	cardsho		;   cardsho(0, 0xff, *discx, *discy); // at card
 	pla			;
 	tay			;
 	pla			;
 	tax			;
-	
 	iny			;
-	dex			;
-	bne	-		;
-	stx	HANDREM		;
-	sty	DISCREM		;
-
+	sty	DISCREM		;   DISCREM++;
+	dex			;   HANDREM--;
+	bne	-		;  }
+;	jsr	animhnd		;  
+	jsr	discsho		;  discsho();
+	stx	HANDREM		; }
 +	plp			; return a == 'Y' || a == 'y';
 	rts			;} // animrej()
 rejmsg0	.byte	$04,$09,$13,$03	; DISC

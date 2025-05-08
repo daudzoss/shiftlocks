@@ -5,4 +5,5 @@ tosolve	.byte	$01,$20,$03,$0f	; 1 CO
 	.byte	$40		; _
 solvtxt
 
-gamewon	
+gamewon	lda	#0
+	rts
