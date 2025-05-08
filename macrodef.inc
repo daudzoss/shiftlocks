@@ -89,5 +89,5 @@ printxy	.macro	bytes		;inline void printxy(register uint8_t& a, // len
 	pha			;  register uint8_t& x,register uint8_t& y,//c,r
 	txtclip			;  const uint8_t const* bytes) { // screencodes
 	pla			; txtclip(0, 0, 1);
-	replace	bytes		; replace(bytes, 0, 1);
+	replace	\bytes		; replace(bytes, 0, 1);
 	.endm			;} // printxy()

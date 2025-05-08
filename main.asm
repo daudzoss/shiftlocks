@@ -1,3 +1,5 @@
+.include "macrodef.inc"
+
 .if BASIC
 *	= BASIC+1
 .else
@@ -89,28 +91,26 @@ topline	.text	"the crime scene     "
 	.text	$99,$22
 	.text	" f2",$c0," f4",$c0
 	.text	" f6",$c0," f8",$c0
-	.text	" to solve: 3 col"
-	.text	" of  ",$c0,$d7
-	.text	$9d,$9d,$9d,$94
-	.null	$34,$22,$3a,$99
+	.null	" to solve: ",$22
 +	.word	(+),2055	
-	.text	$99,$22,"pairing "
+	.text	$99,$3a,$99,$22,"pairing "
 	.text	"   +       +    "
 	.null	"   +       +",$22
 +	.word	(+),2055
 	.text	$99,$22
-	.text	" rules: invest",$c0
-	.text	" ",$5f,"threat"
-	.text	" ",$5f,"invest"
-	.null	" ex pile",$22,$3b
-+	.word	(+),2055
-	.text	$9e
+	.text	" rules:",$22,$3b
+	.text	$3a,$9e
 	.null	format("%4d",main)
 +	.word	0
 
 .if !BASIC
 *	= COPIED2
 .endif
+
+solvlen	.byte	solvtxt-tosolve	; (both addresses defined in the included file)
+.include "gamerule.asm"
+abillen	.byte	abiltxt-ability	; (both addresses defined in the included file)
+.include "playeras.asm"
 
 SCREEND	= SCREENC-SCREENM
 SCRSIZE	= SCREENW*SCREENH
@@ -141,56 +141,54 @@ SCRATCH	= UNSAVED + $1
 
 start
 
-stddeck	.text	$00,$00,$00,$00,$00,$00,$00,$00
-	.text	$01,$01,$01,$01,$01,$01,$01,$01
-	.text	$02,$02,$02,$02,$02,$02,$02,$02
-	.text	$03,$03,$03,$03,$03,$03,$03,$03
-	.text	$04,$04,$04,$04,$05,$05,$05,$05
-	.text	$06,$06,$06,$06,$07,$07,$07,$07
+stddeck	.byte	$00,$00,$00,$00,$00,$00,$00,$00
+	.byte	$01,$01,$01,$01,$01,$01,$01,$01
+	.byte	$02,$02,$02,$02,$02,$02,$02,$02
+	.byte	$03,$03,$03,$03,$03,$03,$03,$03
+	.byte	$04,$04,$04,$04,$05,$05,$05,$05
+	.byte	$06,$06,$06,$06,$07,$07,$07,$07
 pstdeck
 
 
 ;;; 1,2,3,4 = 000,001,010,011
 ;;; A,B,C,D = 100,101,110,111
 cardnum
-invest0	.text	$b1,$b2,$b3,$b4	; const
-threat0	.text	$81,$82,$83,$84
+invest0	.byte	$b1,$b2,$b3,$b4	; const
+threat0	.byte	$81,$82,$83,$84
 cardtyp
-investc	.text	$c0,$d7
-threatc	.text	$db,$c0
-pileout	.text	$4f,$77,$50
-	.text	$65,$0f,$67
-	.text	$65,$15,$67
-	.text	$65,$14,$67
-	.text	$4c,$6f,$7a
-cardofs	.text	0*SCREENW+0,0*SCREENW+1,0*SCREENW+2
-	.text	1*SCREENW+0,1*SCREENW+1,1*SCREENW+2
-	.text	2*SCREENW+0,2*SCREENW+1,2*SCREENW+2
-	.text	3*SCREENW+0,3*SCREENW+1,3*SCREENW+2
-	.text	4*SCREENW+0,4*SCREENW+1,4*SCREENW+2
-cardclr	.text	$66,$63,$64,$65
-	.text	$32,$3a,$58,$69
-woundsx	.text	$0b
-woundsy	.text	$07
-solvex	.text	$1b
-solvey	.text	$15
-solvlen	.text	solvtxt-tosolve
-abilix	.text	$08
-abiliy	.text	$18
-abillen	.text	abiltxt-ability
-drawx	.text	$12
-drawy	.text	$10
-discx	.text	$12
-discy	.text	$00
-inhandx	.text	$01,$05,$09,$0d
-inhandy	.text	$10;,$10,$10,$10
-stackx	.text	$00,$04,$08,$0c
-	.text	$00,$04,$08,$0c	
-	.text	$16,$1b,$20,$25
-stacky	.text	9,9,9,9,1,1,1,1
-	.text	1,1,1,1		;bottom card of a stack allowed to grow up to...
-stacklm	.text	1,1,1,1,1,1,1,1
-	.text	$10,$10,$10,$10	;16 (alternating invest with threat or removals)
+investc	.byte	$c0,$d7
+threatc	.byte	$db,$c0
+pileout	.byte	$4f,$77,$50
+	.byte	$65,$20,$67
+	.byte	$65,$20,$67
+	.byte	$65,$20,$67
+	.byte	$4c,$6f,$7a
+cardofs	.byte	0*SCREENW+0,0*SCREENW+1,0*SCREENW+2
+	.byte	1*SCREENW+0,1*SCREENW+1,1*SCREENW+2
+	.byte	2*SCREENW+0,2*SCREENW+1,2*SCREENW+2
+	.byte	3*SCREENW+0,3*SCREENW+1,3*SCREENW+2
+	.byte	4*SCREENW+0,4*SCREENW+1,4*SCREENW+2
+cardclr	.byte	$66,$63,$64,$65
+	.byte	$32,$3a,$58,$69
+woundsx	.byte	$0b
+woundsy	.byte	$07
+drawx	.byte	$12
+drawy	.byte	$10
+discx	.byte	$12
+discy	.byte	$00
+solvex	.byte	$1b
+solvey	.byte	$15
+abilix	.byte	$08
+abiliy	.byte	$18
+inhandx	.byte	$01,$05,$09,$0d
+inhandy	.byte	$10;,$10,$10,$10
+stackx	.byte	$00,$04,$08,$0c
+	.byte	$00,$04,$08,$0c	
+	.byte	$16,$1b,$20,$25
+stacky	.byte	9,9,9,9,1,1,1,1
+	.byte	1,1,1,1		;bottom card of a stack allowed to grow up to...
+stacklm	.byte	1,1,1,1,1,1,1,1
+	.byte	$10,$10,$10,$10	;16 (alternating invest with threat or removals)
 
 main	lda	#0		;void main (void) {
 	sta	DISCREM		;
@@ -201,13 +199,10 @@ main	lda	#0		;void main (void) {
 	lda 	#DECKSIZ	;
 	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
 newhand	jsr	drw4hnd		; do {
- bne +	
- brk
- +
 	sta	HANDFOM		;  HANDFOM = drw4hand(); // nonzero if we drew 4
 	bne	+		;  if (HANDFOM == 0)
 	brk			;   exit(1); // more than 44 cards in office?!?
-	.text	$1		;
+	.byte	$1		;
 +	jsr	animhnd		;  animhnd(); // draw empty deck pile after if 0
 	lda	HANDFOM		;
 	jsr	redrwok		;
@@ -235,16 +230,14 @@ finishr	lda	#0		;void finishr(void) {
 	adc	#$01		;
 	and	#$07		;
 	bne	-		; }
-	lda	#abiltxt-ability;
+	lda	abillen		;
 	ldx	abilix		;
 	ldy	abiliy		;
-	printxy	abiltxt		; printxy(, abilix, abiliy
-
-	lda	#solvtxt-tosolve;
+	printxy	ability		; printxy(ability, abilix, abiliy, abillen);
+	lda	solvlen		;
 	ldx	solvex		;
 	ldy	solvey		;
-	printxy	solvtxt		;
-	
+	printxy	tosolve		; printxy(tosolve, solvex, solvey, solvlen);
 	rts			;} // finishr()
 
 cardsho	php			;void cardsho(uint1_t& c, register uint8_t& a,
@@ -445,8 +438,8 @@ drw1new	ldx	DECKREM		;int8_t drw1new(void) {
 	lda	DECK,x		;  return DECK[--DECKREM];
 +	rts			;} // drw1new()
 
-drwflag	.text	$01,$02,$04,$08	;static const uint8_t drwflag[] = {1, 2, 4, 8,
-	.text	$10,$20,$40,$80	;                                 16,32,64,128};
+drwflag	.byte	$01,$02,$04,$08	;static const uint8_t drwflag[] = {1, 2, 4, 8,
+	.byte	$10,$20,$40,$80	;                                 16,32,64,128};
 drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	bne	++		; if (HANDREM == 0) { // should've emptied first
 	ldy	#8		;  register uint8_t a, x, y;
@@ -473,7 +466,7 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	jsr	drw1new		;    a = drw1new();
 	bpl	+		;    if (a < 0) // all cards evaporated somehow?
 	brk			;     exit(2);
-	.text	2		;   } // a is a valid card in the range 0 ~ 7
+	.byte	2		;   } // a is a valid card in the range 0 ~ 7
 +	;and	#$07		;
 	sta	HAND-1,y	;   HAND[y] = a /* & 0x07 */;
 	tax			;
@@ -534,13 +527,24 @@ animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 drawsho	ldx	drawx		;void drawsho(void) {
 	ldy	drawy		;
 	lda	DECKREM		;
-	beq	+		; if  (DECKREM)
+	beq	+		; if  (DECKREM) {
 	clc			;
 	lda	#REVCARD	;  // draw just the blank card back
 	jsr	cardsho		;  cardsho(0,a = REVCARD, x = drawx, y = drawy);
-	;; FIXME: need to re-draw the center question mark
-	rts			; else
+	lda	#$bf		;
+	ldy	cardofs+7	;  printxy("?"       , drawx + 1, drawy + 2, 1);
+	sta	(ZP),y		;
+	rts			; } else {
 +	jsr	cardout		;  cardout(x = drawx, y = drawy);
+	lda	#$0f		;
+	ldy	cardofs+3+1	;  printxy("O"  - "@", drawx + 1, drawy + 1, 1);
+	sta	(ZP),y		;
+	lda	#$15		;
+	ldy	cardofs+3+3+1	;  printxy("U"  - "@", drawx + 1, drawy + 2, 1);
+	sta	(ZP),y		;
+	lda	#$14		;
+	ldy	cardofs+3+3+3+1	;  printxy("T"  - "@", drawx + 1, drawy + 3, 1);
+	sta	(ZP),y		; }
 	rts			;} // drawsho()
 
 discsho	ldx	discx		;void discsho(void) {
