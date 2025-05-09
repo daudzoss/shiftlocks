@@ -111,10 +111,8 @@ topline	.text	"the crime scene     "
 *	= COPIED2
 .endif
 
-solvlen	.byte	solvtxt-tosolve	; (both addresses defined in the included file)
-.include "gamerule.asm"
-abillen	.byte	abiltxt-ability	; (both addresses defined in the included file)
-.include "playeras.asm"
+.include "gamerule.asm"		; tosolve, solvlen
+.include "playeras.asm"		; abillen, ability
 
 SCREEND	= SCREENC-SCREENM
 SCRSIZE	= SCREENW*SCREENH
@@ -133,15 +131,26 @@ HANDREM = UNDOABH + 0
 DISCREM	= UNDOABH + 1
 DECKREM	= UNDOABH + 2
 NWOUNDS	= UNDOABH + 3
-HANDHST	= UNDOABH + 4
-HANDGET	= UNDOABH + $c;?
-HANDFOM	= UNDOABH + $d;?
-;????	= UNDOABH + $e?
-;????	= UNDOABH + $f
+HANDFOM	= UNDOABH + $c
+MOVEPWR	= UNDOABH + $d
+TOSCENE	= UNDOABH + $e
+TOFFICE	= UNDOABH + $f
 
-UNSAVED	= vararea + $100
-TEMPVAR	= UNSAVED + $0
-SCRATCH	= UNSAVED + $1
+UNSAVED	= vararea + $80
+.if UNSAVED <= TOFFICE
+.error "saved variables crashed into ceiling, obliterated UNSAVED"
+.endif
+HANDHST	= UNSAVED + $0
+TEMPVAR	= UNSAVED + $8
+SCRATCH	= UNSAVED + $9		; must be last
+
+snapsht	rts
+
+undomov	rts
+
+F1_KEY	= $85
+DEL_KEY	= $14
+INS_KEY	= $64; FIXME
 
 start
 
@@ -202,21 +211,91 @@ main	lda	#0		;void main (void) {
 	jsr	discsho		; discsho();
 	jsr	initstk		; initstk();
 	jsr	animshf		; animshf();
-newhand	jsr	drw4hnd		;  while (1) {
+
+	nop			; do {
+newhand	jsr	drw4hnd		;  do {
 	sta	HANDFOM		;   HANDFOM = drw4hand(); // nonzero if we drew 4
 	bne	+		;   if (HANDFOM == 0)
 	brk			;    exit(1); // more than 44 cards in office?!?
 	.byte	$1		;
-+	jsr	animhnd		;   animhnd(); // draw empty deck pile after if 0
++	jsr	snapsht		;   snapshot();
+	jsr	animhnd		;   animhnd(); // draw empty deck pile after if 0
 	lda	HANDFOM		;
 	jsr	rejctok		;
       	bne	+		;
 	jsr	animrej		;
 	beq	newhand		;  } while (rejctok(HANDFOM) && animrej());
-+
-- jsr $ffe4
- beq -
+
++	lda	#0		;
+	sta	TOSCENE		;
+	sta	TOFFICE		;  TOSCENE = TOFFICE = 0;
+
+getmove	jsr	$ffe4		;
+	beq	getmove		;  a = getchar();
+
+	cmp	#DEL_KEY	;  if (a == DEL_KEY) {
+	bne	+		;
+;	jsr	undomov		;   undomov();
+	jmp	getmove		;   continue;
+
++	cmp	#INS_KEY	;
+	bne	+		;  } else if (a == INS_KEY) {
+;	jsr	redomov		;   redomov();   
+	jmp	getmove		;   continue;
+
+
++	cmp	#'1'		;
+	bcc	notfkey		;  } else if (a >= '1'
+	cmp	#'9'		;             &&
+	bcs	+		;             a < '8') {
+	sec			;
+	sbc	#'1'-1		;   a -= '0'; 1-8, odd: crimescene, even: office
+	bcs	++		;
+
++	cmp	#F1_KEY		;
+	bcc	notfkey		;  } else if (a >= F1_KEY
+	cmp	#F1_KEY+8	;      &&
+	bcs	notfkey		;      a < F1_KEY+8) {
+	sec			;
+	sbc	#F1_KEY-1	;   a -= F1_KEY - 1; 1~8, odd/even as above
+
++	tax			;  }
+	lda	#0		;
+	sec			;
+-	rol			;
+	dex			;
+	bne	-		;  a = 1 << (a - 1);
+;	jsr	moveok		;
+	beq	getmove		;
+
+notfkey
  	rts			;} // main()
+
+officem	.byte	$aa		;
+moveok	bit	officem		;uint8_t moveok(register uint8_t& a) {
+	beq	scenem		; if (a & 0xaa) { // trying dec TOFFICE, compat?
+	pha			;  FIXME: need to check compatibility of piles
+
+	
+	dec	TOFFICE		;  if (TOFFICE--) // had at least 1 of 2 allowed
+	bpl	+		;   return a;
+	pla			;  else
+	lda	#0		;
+	sta	TOFFICE		;   return a = ++TOFFICE; // = 0;
+	pha			;
++	pla			;
+	rts			;
+
+scenem	pha			; } else { // trying dec TOSCENE, less stringent
+	dec	TOSCENE		;  if (TOSCENE--) // had at least 1 of 2 allowed
+	bpl	+		;   return a;
+	pla			;  else
+	lda	#0		;
+	sta	TOSCENE		;   return a = ++TOSCENE; // = 0;
+	pha			;
++	pla			; }
+	rts			;} // moveok()
+
 
 finishr	lda	#0		;void finishr(void) {
 -	pha			; register uint8_t a, x, y;

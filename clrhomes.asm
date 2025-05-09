@@ -1,4 +1,5 @@
 ;;; C. L. R. "Shiftlock" Home, solitary consulting detective
+abillen	.byte	abiltxt-ability
 ability	.byte	$09,$0e,$16,$05	; INVE
 	.byte	$13,$14,$40,$20	; ST_
 	.byte	$1f,$14,$08,$12	; <THR

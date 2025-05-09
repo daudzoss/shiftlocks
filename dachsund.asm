@@ -1,4 +1,5 @@
-;;; Walker Dachsund, veteran physician
+;;; Walker Dachsund, veteran physician not veterinarian despite the name
+abillen	.byte	abiltxt-ability
 ability	.byte	$14,$08,$12,$05	; THRE
 	.byte	$01,$14,$40,$20	; AT_
 	.byte	$09,$0e,$16,$05	; INVE
