@@ -196,22 +196,7 @@ main	lda	#0		;void main (void) {
 	sta	NWOUNDS		; NWOUNDS = DISCREM = HANDREM = 0;
 	jsr	finishr		; finishr(); // rule/ability text and card color
 	jsr	initstk		; initstk();
-	lda 	#DECKSIZ	;
-	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
-	ldx	#$ff		;
--	txa			;
-	pha			; for (register uint8_t a = 255; a; a--) {
-	lda	#0		;
-	jsr	shuffle		;  shuffle(0);
-	lda	DECK		;
-	ldx	drawx		;
-	ldy	drawy		;
-	clc			;
-	jsr	cardsho		;  cardsho(0, DECK[0], drawx, drawy);
-	pla			;
-	tax			;
-	dex			;
-	bne	-		; }
+	jsr	animshf		; animshf();
 newhand	jsr	drw4hnd		; do {
 	sta	HANDFOM		;  HANDFOM = drw4hand(); // nonzero if we drew 4
 	bne	+		;  if (HANDFOM == 0)
@@ -444,6 +429,24 @@ shuffl2	txa			;  for (register uint8_t y = 255; y; y--) {
 	bne	shuffl1		; }
 	rts			;} //shuffle()
 
+animshf	lda 	#DECKSIZ	;void animshf(void) {
+	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
+	ldx	#$14		;
+-	txa			;
+	pha			; for (register uint8_t x = 20; x; x--) {
+	lda	#0		;
+	jsr	shuffle		;  shuffle(0);
+	lda	DECK		;
+	ldx	drawx		;
+	ldy	drawy		;
+	clc			;
+	jsr	cardsho		;  cardsho(0, DECK[0], drawx, drawy);
+	pla			;
+	tax			;
+	dex			;
+	bne	-		; }
+	rts			;}
+
 drw1new	ldx	DECKREM		;int8_t drw1new(void) {
 	dex			; // x gets clobbered hence drw4hand() loop on y
 	txa			; if (DECKREM <= 0)
@@ -538,10 +541,10 @@ animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 	tax			; }
 	dex			; drawsho();
 	bne	-		;} // animhnd()
-drawsho	ldx	drawx		;void drawsho(void) {
-	ldy	drawy		;
-	lda	DECKREM		;
+drawsho	lda	DECKREM		;void drawsho(void) {
 	beq	+		; if  (DECKREM) {
+	ldx	drawx		;
+	ldy	drawy		;
 	clc			;
 	lda	#REVCARD	;  // draw just the blank card back
 	jsr	cardsho		;  cardsho(0,a = REVCARD, x = drawx, y = drawy);
