@@ -234,7 +234,7 @@ newhand	jsr	drw4hnd		;  do {
 	jsr	animhnd		;   animhnd(); // draw empty deck pile after if 0
 	lda	HANDFOM		;
 	jsr	rejctok		;
-      	bne	+		;
+      	beq	+		;
 	jsr	animrej		;
 	beq	newhand		;  } while (rejctok(HANDFOM) && animrej());
 
@@ -636,12 +636,12 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 
 rejctok	sta	TEMPVAR		;uint8_t rejctok(register uint8_t& a) {
 	and	#$0f		; if (a & 0x0f == 0) // got no investig. cards
-	beq	+++		;  return 1;
+	beq	rejrtn4		;  return 4;
 	lda	TEMPVAR		;
 	and	#$f0		; else if (a & 0xf0 == 0) // got no threat cards
-	beq	+++		;  return 1;
-	lda	#0		; TEMPVAR = a;
+	beq	rejrtn4		;  return 4;
 .if 1
+	lda	#0		; TEMPVAR = a;
 	clc			; // optimization (check flag bits before array)
 	rol	TEMPVAR		;
 -	ror	TEMPVAR		; for (a = 0; TEMPVAR; TEMPVAR >>= 1) // 1-count
@@ -649,19 +649,19 @@ rejctok	sta	TEMPVAR		;uint8_t rejctok(register uint8_t& a) {
 	adc	#0		;
 	bcc	-		;  a++;  // (this adc will never set carry)
 +	cmp	#3		;
-	bcs	+		; if (a < 3) { // might have 3 copies of a card
+	bcs	rejrtn3		; if (a < 3) { // might have 3 copies of a card
 .endif
 	lda	#1		;
 	ldy	#8		;
 -	ldx	HANDHST-1,y	;  for (register int8_t y = 7; y >= 0; y--)
 	cpx	#3		;   if (HANDHST[y] >= 3)
-	bcs	+++		;    return 1; // indeed have 3 copies of card y
+	bcs	rejrtn3		;    return 3; // indeed have 3 copies of card y
 	dey			;
 	bne	-		; }
-+	lda	#$ff		; return 0;
-+	clc			;
-	adc	#1		;
-+	rts			;} // rejctok()
+rerrtn0	lda	#$fc		; return 0;
+rejrtn4	clc			;
+	adc	#4		;
+rejrtn3	rts			;} // rejctok()
 
 animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 	beq	drawsho		; if (HANDREM) {
