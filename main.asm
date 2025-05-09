@@ -45,7 +45,7 @@ topline	.text	"the crime scene     "
 	.null	"dis-",$22
 +	.word	(+), 2055
 	.text	$99,$22
-	.text	"   ",$12,"wounds: 0"
+	.text	"   ",$12,"wounds: ?"
 	.null	$92,"     card",$22
 +	.word	(+), 2055
 	.text	$99,$22
@@ -116,9 +116,12 @@ topline	.text	"the crime scene     "
 
 SCREEND	= SCREENC-SCREENM
 SCRSIZE	= SCREENW*SCREENH
+ONLYTOP	= SCREENM+SCREENW*(SCREENH-8)
+WDX	= $0b
+WDY	= $07
+
 REVCARD = $08
 NONCARD	= $09
-ONLYTOP	= SCREENM+SCREENW*(SCREENH-8)
 DECKSIZ	= pstdeck-stddeck
 
 UNDOABL	= vararea
@@ -148,9 +151,18 @@ snapsht	rts
 
 undomov	rts
 
+redomov	rts
+
 F1_KEY	= $85
+F3_KEY	= $86
+F5_KEY	= $87
+F7_KEY	= $88
+F2_KEY	= $89
+F4_KEY	= $8a
+F6_KEY	= $8b
+F8_KEY	= $8c
 DEL_KEY	= $14
-INS_KEY	= $64; FIXME
+INS_KEY	= $94
 
 start
 
@@ -183,8 +195,6 @@ cardofs	.byte	0*SCREENW+0,0*SCREENW+1,0*SCREENW+2
 	.byte	4*SCREENW+0,4*SCREENW+1,4*SCREENW+2
 cardclr	.byte	$66,$63,$64,$65
 	.byte	$32,$3a,$58,$69,0,0
-woundsx	.byte	$0b
-woundsy	.byte	$07
 drawx	.byte	$12
 drawy	.byte	$10
 discx	.byte	$12
@@ -202,11 +212,13 @@ stacky	.byte	9,9,9,9,1,1,1,1
 	.byte	1,1,1,1		;bottom card of a stack allowed to grow up to...
 stacklm	.byte	1,1,1,1,1,1,1,1
 	.byte	$10,$10,$10,$10	;16 (alternating invest with threat or removals)
+isoffic	.byte	$04		;for nondestructive bit tests
 
 main	lda	#0		;void main (void) {
 	sta	DISCREM		;
 	sta	HANDREM		;
 	sta	NWOUNDS		; NWOUNDS = DISCREM = HANDREM = 0;
+	digitxy	NWOUNDS,WDX,WDY	; digitxy(NWOUNDS, WDX, WDY);
 	jsr	finishr		; finishr(); // rule/ability text and card color
 	jsr	discsho		; discsho();
 	jsr	initstk		; initstk();
@@ -226,57 +238,87 @@ newhand	jsr	drw4hnd		;  do {
 	jsr	animrej		;
 	beq	newhand		;  } while (rejctok(HANDFOM) && animrej());
 
-+	lda	#0		;
++	lda	#2		;
 	sta	TOSCENE		;
-	sta	TOFFICE		;  TOSCENE = TOFFICE = 0;
+	sta	TOFFICE		;  TOSCENE = TOFFICE = 2; // must play 2 to each
 
-getmove	jsr	$ffe4		;
-	beq	getmove		;  a = getchar();
+getmove	lda	#0		;  do {
+	sta	TEMPVAR		;   TEMPVAR = 0;
+	jsr	$ffe4		;
+	beq	getmove		;   a = getchar();
 
-	cmp	#DEL_KEY	;  if (a == DEL_KEY) {
+	cmp	#DEL_KEY	;   if (a == DEL_KEY) {
 	bne	+		;
-;	jsr	undomov		;   undomov();
-	jmp	getmove		;   continue;
+	jsr	undomov		;    undomov();
+	jmp	getmove		;    continue;
 
 +	cmp	#INS_KEY	;
-	bne	+		;  } else if (a == INS_KEY) {
-;	jsr	redomov		;   redomov();   
-	jmp	getmove		;   continue;
-
+	bne	+		;   } else if (a == INS_KEY) {
+	jsr	redomov		;    redomov();   
+	jmp	getmove		;    continue;
 
 +	cmp	#'1'		;
-	bcc	notfkey		;  } else if (a >= '1'
-	cmp	#'9'		;             &&
-	bcs	+		;             a < '8') {
+	bcc	notfkey		;   } else if (a >= '1'
+	cmp	#'8'+1		;              &&
+	bcs	+		;              a < '9') {
 	sec			;
-	sbc	#'1'-1		;   a -= '0'; 1-8, odd: crimescene, even: office
-	bcs	++		;
+	sbc	#'1'		;    a -= '1'; // 0~7 even:crimescene,odd:office
+	lsr			;    // a:         0   1   2   3   4   5   6   7
+	ldy	#3		;              // CS  OF  CS  OF  CS  OF  CS  OF
+-	rol	TEMPVAR		;    // (a&1)<<2:  0   4   0   4   0   4   0   4
+	dey			;    // a>>1:      0   0   1   1   2   2   3   3
+	bne	-		;    TEMPVAR = ((a & 1) << 2) | (a >> 1);
+	lda	TEMPVAR		;    a = TEMPVAR; // 0~3 crimescene, 4~7 office!
+	sty	TEMPVAR		;    TEMPVAR = 0;
+	beq	trymove		;
 
 +	cmp	#F1_KEY		;
-	bcc	notfkey		;  } else if (a >= F1_KEY
-	cmp	#F1_KEY+8	;      &&
-	bcs	notfkey		;      a < F1_KEY+8) {
+	bcc	notfkey		;   } else if (a >= F1_KEY
+	cmp	#F1_KEY+8	;              &&
+	bcs	notfkey		;              a < F1_KEY+8) {
 	sec			;
-	sbc	#F1_KEY-1	;   a -= F1_KEY - 1; 1~8, odd/even as above
-
-+	tax			;  }
-	lda	#0		;
-	sec			;
--	rol			;
-	dex			;
-	bne	-		;  a = 1 << (a - 1);
-;	jsr	moveok		;
-	beq	getmove		;
-
-notfkey
- 	rts			;} // main()
-
-officem	.byte	$aa		;
-moveok	bit	officem		;uint8_t moveok(register uint8_t& a) {
-	beq	scenem		; if (a & 0xaa) { // trying dec TOFFICE, compat?
-	pha			;  FIXME: need to check compatibility of piles
-
+	sbc	#F1_KEY		;    a -= F1_KEY - 1;// 0~3 crimescene, 4~7 as ^
+	bcs	trymove		;
 	
+notfkey	jmp	getmove		;   } else continue;
+	
+trymove	pha			;
+	jsr	movedok		;   
+	bne	numleft		;   if (!movedok(a)) { // returns a if ok, or 0
+;	jsr	warning		;    if (warning() == 0 /* 0 wounds accepted */)
+	bne	acceptw		;
+	pla			;
+	beq	notfkey		;     continue;
+acceptw	inc	NWOUNDS		;    NWOUNDS++;
+	digitxy	NWOUNDS,WDX,WDY	;    digitxy(NWOUNDS, WDX, WDY);
+numleft	lda	NWOUNDS		;   }
+	cmp	#$03		;
+	bcc	+		;   if (NWOUNDS >= 3)
+	pla			;
+	bcs	mainend		;    exit(0);
++	pla			;
+	bit	isoffic		;
+	beq	+		;   if (a & 0x04)  // played to office
+	dec	TOFFICE		;    TOFFICE--; // indicate use one of our two
+	inc	TOSCENE		;   else
++	dec	TOSCENE		;    TSCENE--; // indicate use one of our two
+	
+	jsr	animhnd		;   animhnd(); // show the card as missing
+	
+	jsr	snapsht		;   snapsht();
+	lda	HANDREM		;
+	beq	+		;
+	jmp	getmove		;  } while (HANDREM);
++	jsr	gamewon		;
+	bne	mainend		;
+	jmp	newhand		; } while (!gamewon());
+mainend	rts			;} // main()
+
+officem	.byte	$f0		;
+movedok	bit	officem		;uint8_t moveok(register uint8_t& a) {
+	beq	scenem		; if (a & 0xaa) { // trying dec TOFFICE, compat?
+
+	pha			;  FIXME: need to check compatibility of piles
 	dec	TOFFICE		;  if (TOFFICE--) // had at least 1 of 2 allowed
 	bpl	+		;   return a;
 	pla			;  else
@@ -284,7 +326,7 @@ moveok	bit	officem		;uint8_t moveok(register uint8_t& a) {
 	sta	TOFFICE		;   return a = ++TOFFICE; // = 0;
 	pha			;
 +	pla			;
-	rts			;
+	rts			;  FIXME: need to update the new location of card
 
 scenem	pha			; } else { // trying dec TOSCENE, less stringent
 	dec	TOSCENE		;  if (TOSCENE--) // had at least 1 of 2 allowed

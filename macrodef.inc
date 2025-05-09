@@ -91,3 +91,14 @@ printxy	.macro	bytes		;inline void printxy(register uint8_t& a, // len
 	pla			; txtclip(0, 0, 1);
 	replace	\bytes		; replace(bytes, 0, 1);
 	.endm			;} // printxy()
+
+digitxy	.macro	d,x,y		;inline void digitxy(const uint8_t* d, const
+	lda	#$80		;                  uint8_t x, const uint8_t y) {
+	and SCREENM+\x+SCREENW*\y
+	ora	\d		; register uint8_t a =SCREENM[x+SCREENW*y]&0x80;
+	ora	#$30		; a |= *d | '0'; // RVS property gets preserved
+	cmp	#$39+1		; if (a <= '9')
+	bcs	+		;    SCREENM[x+SCREENW*y] = a; // write if valid
+	sta SCREENM+\x+SCREENW*\y
++
+	.endm			;}
