@@ -621,10 +621,8 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	bpl	+		;    if (a < 0) // all cards evaporated somehow?
 	pla			;
 	rts			;     return retval; // exit with what we've got
-	.byte	2		;   } // a is a valid card in the range 0 ~ 7
-+	;and	#$07		;
++	tax			;   } // a is a valid card in the range 0 ~ 7
 	sta	HAND-1,y	;   HAND[y] = a /* & 0x07 */;
-	tax			;
 	inc	HANDHST,x	;   HANDHST[a]++; // reflected in hand histogram
 	inc	HANDREM		;   HANDREM++; // hand size grows toward 4 by 1
 	pla			;
@@ -643,14 +641,16 @@ rejctok	sta	TEMPVAR		;uint8_t rejctok(register uint8_t& a) {
 	and	#$f0		; else if (a & 0xf0 == 0) // got no threat cards
 	beq	+++		;  return 1;
 	lda	#0		; TEMPVAR = a;
-	clc			;
+.if 1
+	clc			; // optimization (check flag bits before array)
 	rol	TEMPVAR		;
 -	ror	TEMPVAR		; for (a = 0; TEMPVAR; TEMPVAR >>= 1) // 1-count
 	beq	+		;
 	adc	#0		;
 	bcc	-		;  a++;  // (this adc will never set carry)
 +	cmp	#3		;
-	bcc	+		; if (a < 3) { // might have 3 copies of a card
+	bcs	+		; if (a < 3) { // might have 3 copies of a card
+.endif
 	lda	#1		;
 	ldy	#8		;
 -	ldx	HANDHST-1,y	;  for (register int8_t y = 7; y >= 0; y--)
