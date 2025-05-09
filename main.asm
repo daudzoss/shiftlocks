@@ -242,9 +242,7 @@ newhand	jsr	drw4hnd		;  do {
 	sta	TOSCENE		;
 	sta	TOFFICE		;  TOSCENE = TOFFICE = 2; // must play 2 to each
 
-getmove	lda	#0		;  do {
-	sta	TEMPVAR		;   TEMPVAR = 0;
-	jsr	$ffe4		;
+getmove	jsr	$ffe4		;  do {
 	beq	getmove		;   a = getchar();
 
 	cmp	#DEL_KEY	;   if (a == DEL_KEY) {
@@ -261,6 +259,8 @@ getmove	lda	#0		;  do {
 	bcc	notfkey		;   } else if (a >= '1'
 	cmp	#'8'+1		;              &&
 	bcs	+		;              a < '9') {
+	lda	#0		;
+	sta	TEMPVAR		;   TEMPVAR = 0;
 	sec			;
 	sbc	#'1'		;    a -= '1'; // 0~7 even:crimescene,odd:office
 	lsr			;    // a:         0   1   2   3   4   5   6   7
@@ -269,8 +269,8 @@ getmove	lda	#0		;  do {
 	dey			;    // a>>1:      0   0   1   1   2   2   3   3
 	bne	-		;    TEMPVAR = ((a & 1) << 2) | (a >> 1);
 	lda	TEMPVAR		;    a = TEMPVAR; // 0~3 crimescene, 4~7 office!
-	sty	TEMPVAR		;    TEMPVAR = 0;
-	beq	trymove		;
+	;sty	TEMPVAR		;    ;TEMPVAR = 0;
+	jmp trymove;beq	trymove		;
 
 +	cmp	#F1_KEY		;
 	bcc	notfkey		;   } else if (a >= F1_KEY
@@ -278,13 +278,22 @@ getmove	lda	#0		;  do {
 	bcs	notfkey		;              a < F1_KEY+8) {
 	sec			;
 	sbc	#F1_KEY		;    a -= F1_KEY - 1;// 0~3 crimescene, 4~7 as ^
-	bcs	trymove		;
+	jmp trymove;bcs	trymove		;
 	
 notfkey	jmp	getmove		;   } else continue;
 	
 trymove	pha			;
+	and	#$03		;
+	tay			;
+	lda	HAND,y		;
+	and	#$f8		;
+	beq	+		;   if (HAND[a] >= 8)
+	pla			;
+	jmp	getmove		;    continue; // already played that card
++	pla			;
+	pha			;
 	jsr	movedok		;   
-	bne	numleft		;   if (!movedok(a)) { // returns a if ok, or 0
+	bne	numleft		;   if (!movedok(a)) { //returns 1<<a if ok or 0
 ;	jsr	warning		;    if (warning() == 0 /* 0 wounds accepted */)
 	bne	acceptw		;
 	pla			;
@@ -303,7 +312,17 @@ numleft	lda	NWOUNDS		;   }
 	inc	TOSCENE		;   else
 +	dec	TOSCENE		;    TSCENE--; // indicate use one of our two
 	
+.if 1
+	and	#$03		;
+	tay			;
+	ldx	inhandx,y	;
+	ldy	inhandy		;
+	clc			;
+	lda	#NONCARD	;
+	jsr	cardsho		;
+.else
 	jsr	animhnd		;   animhnd(); // show the card as missing
+.endif
 	
 	jsr	snapsht		;   snapsht();
 	lda	HANDREM		;
@@ -317,28 +336,32 @@ mainend	rts			;} // main()
 officem	.byte	$f0		;
 movedok	bit	officem		;uint8_t moveok(register uint8_t& a) {
 	beq	scenem		; if (a & 0xf0) { // trying dec TOFFICE, compat?
-
-	pha			;  FIXME: need to check compatibility of piles
-	dec	TOFFICE		;  if (TOFFICE--) // had at least 1 of 2 allowed
-	bpl	+		;   return a;
-	pla			;  else
+	dec	TOFFICE		;  if (TOFFICE-- == 0) // didn't already play 2
+	bpl	handgap		;//FIXME:need to check compatibility of pile too
 	lda	#0		;
-	sta	TOFFICE		;   return a = ++TOFFICE; // = 0;
-	pha			;
-+	pla			;
- brk
- brk
-	rts			;  FIXME: need to update the new location of card
-
-scenem	pha			; } else { // trying dec TOSCENE, less stringent
-	dec	TOSCENE		;  if (TOSCENE--) // had at least 1 of 2 allowed
-	bpl	+		;   return a;
-	pla			;  else
+	sta	TOFFICE		;   return a = TOFFICE = 0;
+	beq	notmove		; } else { // trying dec TOSCENE, less stringent
+scenem	dec	TOSCENE		;  if (TOSCENE-- == 0) // didn't already play 2
+	bpl	handgap		;
 	lda	#0		;
-	sta	TOSCENE		;   return a = ++TOSCENE; // = 0;
-	pha			;
-+	pla			; }
-	rts			;} // moveok()
+	sta	TOSCENE		;   return a = TOSCENE = 0;
+	beq	notmove		; }
+	
+handgap	pha			;
+	and	#$03		;
+	tay			;
+	lda	#NONCARD	;//FIXME:need to update the new location of card
+	sta	HAND,y		; HAND[a & 0x03] = NONCARD;
+	dec	HANDREM		; HANDREM--;
+	pla			;
+	tay			;
+	iny			;
+	lda	#0		;
+	sec			;
+-	rol			;
+	dey			;
+	bne	-		; return 1<<a;
+notmove	rts			;} // moveok()
 
 
 finishr	lda	#0		;void finishr(void) {
