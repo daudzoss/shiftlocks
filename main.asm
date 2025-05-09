@@ -313,9 +313,18 @@ cardsho	php			;void cardsho(uint1_t& c, register uint8_t& a,
 +	lda	investc,y	;
 +	iny			;
 	jsr	selfsho		;  selfsho(c ? threatc[1] : investc[1], y = 2);
-	ldy	#0		; } // top of any bona fide card has been drawn
+	ldy	#0		;  y = 0; // done drawing top of bona fide card
+	beq	+		; } else {
 
-blankit	plp			; y = 0;
+blankit	lda	#$a0		;
+	ldy	#2		;
+	jsr	selfsho		;
+	dey			;  selfsho(0xa0, y = 2);
+	jsr	selfsho		;  selfsho(0xa0, y = 1);
+	dey			;  selfsho(0xa0, y = 0);
+	jsr	selfsho		; }
+	
++	plp			; y = 0;
 	bcs	+		; if (c || // caller explicitly requested a top
 	lda	1+selfsha	;
 	cmp	#1+>ONLYTOP	;
