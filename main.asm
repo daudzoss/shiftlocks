@@ -436,7 +436,7 @@ shuffl2	txa			;  for (register uint8_t y = 255; y; y--) {
 	bne	shuffl2		;  }
 	dex			;
 	bne	shuffl1		; }
-	rts			;} //shuffle()
+	rts			;} // shuffle()
 
 animshf	lda 	#DECKSIZ	;void animshf(void) {
 	jsr	shuffle		; shuffle(/* DECKREM =*/ DECKSIZ);
@@ -454,7 +454,7 @@ animshf	lda 	#DECKSIZ	;void animshf(void) {
 	tax			;
 	dex			;
 	bne	-		; }
-	rts			;}
+	rts			;} // animshf()
 
 drw1new	ldx	DECKREM		;int8_t drw1new(void) {
 	dex			; // x gets clobbered hence drw4hand() loop on y
@@ -471,8 +471,8 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	ldy	#8		;  register uint8_t a, x, y;
 -	sta	HANDHST-1,y	;  for (y = 7; y >= 0; y--)
 	dey			;   HANDHST[y] = 0; // clear the card histogram
-	bne	-		;
-	ldy	#4		;  uint8_t retval = 0; // return figure of merit
+	bne	-		;  uint8_t retval = 0; // return figure of merit
+	ldy	#4		;
 -	pha			;  for (y = 3; y >= 0; y--) {
 	jsr	drw1new		;   a = drw1new();
 	bpl	+		;   if (a < 0) { // deck ran out
@@ -491,7 +491,8 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 	tay			;
 	jsr	drw1new		;    a = drw1new();
 	bpl	+		;    if (a < 0) // all cards evaporated somehow?
-	brk			;     exit(2);
+	pla			;
+	rts			;     return retval; // exit with what we've got
 	.byte	2		;   } // a is a valid card in the range 0 ~ 7
 +	;and	#$07		;
 	sta	HAND-1,y	;   HAND[y] = a /* & 0x07 */;
@@ -550,12 +551,12 @@ animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 	tax			; }
 	dex			; drawsho();
 	bne	-		;} // animhnd()
-drawsho	lda	DECKREM		;void drawsho(void) {
+drawsho	ldx	drawx		;void drawsho(void) {
+	ldy	drawy		; register uint8_t x, y;
+	lda	DECKREM		;
 	beq	+		; if  (DECKREM) {
-	ldx	drawx		;
-	ldy	drawy		;
-	clc			;
 	lda	#REVCARD	;  // draw just the blank card back
+	clc			;
 	jsr	cardsho		;  cardsho(0,a = REVCARD, x = drawx, y = drawy);
 	lda	#$bf		;
 	ldy	cardofs+7	;  printxy("?"       , drawx + 1, drawy + 2, 1);
@@ -576,23 +577,23 @@ drawsho	lda	DECKREM		;void drawsho(void) {
 discsho	ldx	discx		;void discsho(void) {
 	ldy	DISCREM		;
 	beq	+		; if (DISCREM) {
-	tay			; 
 	lda	DISCARD-1,y	;
 	ldy	discy		;
 	clc			;  cardsho(0, a = DISCARD[DISCREM-1],
 	jsr	cardsho		;          x = discx, y = discy);
 	rts			; } else
-+	jsr	cardout		;  cardout(x = discx,  y = discy);
++	ldy	discy		;
+	jsr	cardout		;  cardout(x = discx,  y = discy);
 	rts			;} // discsho()
 
 cardout	clc			;void cardout(register uint8_t& x,
 	lda	#NONCARD	;             register uint8_t& y) { // clear it:
 	jsr	cardsho		; cardsho(0,a = NONCARD, x = drawx, y = drawy);
-	ldx	#cardofs-pileout; // cardsho() left zp pointing to the top left
+	ldx	#cardofs-pileout; // cardsho() left ZP pointing to the top left
 -	lda	cardofs-1,x	; for (int8_t x = 3*5 - 1; x > 0; x--) {
 	tay			;
 	lda	pileout-1,x	;
-	sta	(zp),y		;  zp[cardofs[x]] = pileout[x];
+	sta	(ZP),y		;  zp[cardofs[x]] = pileout[x];
 	dex			;
 	bne	-		; }
 	rts			;} // cardout()
@@ -606,33 +607,35 @@ animrej				;uint1_t animrej(void) {
 	php			; handmsg(SCRATCH, 17, 15); // pop backing store
 	handmsg	SCRATCH,rejmsg1-rejmsg0,rejmsg2-rejmsg1
 	plp			;
-	php
+	php			;
 	bne	+		; if (a == 'Y' || a == 'y') {
 	ldx	#4		;
-	ldy	DISCREM		;  register uint8_t y = DISCREM;
--	lda	HAND-1,x	;  for (register int8_t& x = 3; x >= 0; x--) {
-	sta	DISCARD,y	;   DISCARD[y] = HAND[x];
+	ldy	DISCREM		;
+-	lda	HAND-1,x	;  for (register int8_t x = 3; x >= 0; x--) {
+	sta	DISCARD,y	;
+	iny			;
+	sty	DISCREM		;   DISCARD[DISCREM++] = HAND[x];
 	lda	#NONCARD	;
 	sta	HAND-1,x	;   HAND[x] = 0xff; // blank a 3x5 rectangle...
 	txa			;
 	pha			;
 	tya			;
 	pha			;
+.if 0
+	lda	inhandx-1,x	;
+	tax			;
 	lda	#NONCARD	;
-	ldx	discx		;
-	ldy	discy		;
-	clc			;
-	jsr	cardsho		;   cardsho(0, 0xff, *discx, *discy); // at card
+	ldy	inhandy		;
+	clc			;   // at that card's location:
+	jsr	cardsho		;   cardsho(0, 0xff, inhandx[x], inhandy[x]);
+.endif
+	jsr	discsho		;   discsho(); // and show the card in the pile
 	pla			;
 	tay			;
 	pla			;
 	tax			;
-	iny			;
-	sty	DISCREM		;   DISCREM++;
 	dex			;   HANDREM--;
 	bne	-		;  }
-;	jsr	animhnd		;  
-	jsr	discsho		;  discsho();
 	stx	HANDREM		; }
 +	plp			; return a == 'Y' || a == 'y';
 	rts			;} // animrej()
