@@ -316,7 +316,7 @@ mainend	rts			;} // main()
 
 officem	.byte	$f0		;
 movedok	bit	officem		;uint8_t moveok(register uint8_t& a) {
-	beq	scenem		; if (a & 0xaa) { // trying dec TOFFICE, compat?
+	beq	scenem		; if (a & 0xf0) { // trying dec TOFFICE, compat?
 
 	pha			;  FIXME: need to check compatibility of piles
 	dec	TOFFICE		;  if (TOFFICE--) // had at least 1 of 2 allowed
@@ -326,6 +326,8 @@ movedok	bit	officem		;uint8_t moveok(register uint8_t& a) {
 	sta	TOFFICE		;   return a = ++TOFFICE; // = 0;
 	pha			;
 +	pla			;
+ brk
+ brk
 	rts			;  FIXME: need to update the new location of card
 
 scenem	pha			; } else { // trying dec TOSCENE, less stringent
