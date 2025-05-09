@@ -30,11 +30,15 @@ topline	.text	"the crime scene     "
 	.text	$9d,$9d,$9d,$9d
 	.text	$9d,$9d,$9d,$9d
 	.text	$94,"'"
-	.null	$11,$11,$11,$11,$22
+	.null	$11,$11,$11,$22
 +	.word	(+), 2055
 	.text	$99,$22
 	.text	"                 "
-	.null	$ce,$22
+	.null	$af,$22
++	.word	(+), 2055
+	.text	$99,$22
+	.text	"                 "
+	.null	$ce,$b4,$22
 +	.word	(+), 2055
 	.text	$99,$22
 	.text	"    threats      "
@@ -65,12 +69,12 @@ topline	.text	"the crime scene     "
 	.text	" ",$5e,"f3"
 	.text	" ",$5e,"f5"
 	.text	" ",$5e,"f7"
-	.text	"     "
-	.null	$ce,$22
+	.text	"    "
+	.null	$a7,$ce,$22
 +	.word	(+), 2055
 	.text	$99,$22
 	.text	"                  "
-	.null	$12,"   ",$92,$22
+	.null	$12,"   ",$92,$b7,$22
 +	.word	(+), 2055
 	.text	$99,$22
 	.text	"                  "
@@ -115,7 +119,7 @@ abillen	.byte	abiltxt-ability	; (both addresses defined in the included file)
 SCREEND	= SCREENC-SCREENM
 SCRSIZE	= SCREENW*SCREENH
 REVCARD = $08
-NONCARD	= $ff
+NONCARD	= $09
 ONLYTOP	= SCREENM+SCREENW*(SCREENH-8)
 DECKSIZ	= pstdeck-stddeck
 
@@ -169,7 +173,7 @@ cardofs	.byte	0*SCREENW+0,0*SCREENW+1,0*SCREENW+2
 	.byte	3*SCREENW+0,3*SCREENW+1,3*SCREENW+2
 	.byte	4*SCREENW+0,4*SCREENW+1,4*SCREENW+2
 cardclr	.byte	$66,$63,$64,$65
-	.byte	$32,$3a,$58,$69
+	.byte	$32,$3a,$58,$69,0,0
 woundsx	.byte	$0b
 woundsy	.byte	$07
 drawx	.byte	$12
@@ -195,20 +199,23 @@ main	lda	#0		;void main (void) {
 	sta	HANDREM		;
 	sta	NWOUNDS		; NWOUNDS = DISCREM = HANDREM = 0;
 	jsr	finishr		; finishr(); // rule/ability text and card color
+	jsr	discsho		; discsho();
 	jsr	initstk		; initstk();
 	jsr	animshf		; animshf();
-newhand	jsr	drw4hnd		; do {
-	sta	HANDFOM		;  HANDFOM = drw4hand(); // nonzero if we drew 4
-	bne	+		;  if (HANDFOM == 0)
-	brk			;   exit(1); // more than 44 cards in office?!?
+newhand	jsr	drw4hnd		;  while (1) {
+	sta	HANDFOM		;   HANDFOM = drw4hand(); // nonzero if we drew 4
+	bne	+		;   if (HANDFOM == 0)
+	brk			;    exit(1); // more than 44 cards in office?!?
 	.byte	$1		;
-+	jsr	animhnd		;  animhnd(); // draw empty deck pile after if 0
++	jsr	animhnd		;   animhnd(); // draw empty deck pile after if 0
 	lda	HANDFOM		;
-	jsr	redrwok		;
-   ;   	bne	+		;
+	jsr	rejctok		;
+      	bne	+		;
 	jsr	animrej		;
-	beq	newhand		; } while (/*redrwok(HANDFOM) &&*/ animrej());
+	beq	newhand		;  } while (rejctok(HANDFOM) && animrej());
 +
+- jsr $ffe4
+ beq -
  	rts			;} // main()
 
 finishr	lda	#0		;void finishr(void) {
@@ -348,8 +355,8 @@ blankit	lda	#$a0		;
 	cpx	#NONCARD	; 
 	bcs	+		;   if (x < 8 || x == REVCARD) {
 	iny			;    y = 2;
-	iny			;    if (x == REVCARD) goto colrto2;
-	lda	#0		;    
+	iny			;    a = 0;
+	lda	#0		;    if (x == REVCARD) goto colrto2;    
 	cpx	#REVCARD	;    else goto colrtop;
 	beq	colrto2		;   }
 	bne	colrtop		;  }
@@ -508,7 +515,7 @@ drw4hnd	lda	HANDREM		;void drw4hand(void) {
 +	lda	#0		;  return 0; // Z will be set
 	rts			;} // drw4hand()
 
-redrwok	sta	TEMPVAR		;uint8_t redrwok(register uint8_t& a) {
+rejctok	sta	TEMPVAR		;uint8_t rejctok(register uint8_t& a) {
 	and	#$0f		; if (a & 0x0f == 0) // got no investig. cards
 	beq	+++		;  return 1;
 	lda	TEMPVAR		;
@@ -533,7 +540,7 @@ redrwok	sta	TEMPVAR		;uint8_t redrwok(register uint8_t& a) {
 +	lda	#$ff		; return 0;
 +	clc			;
 	adc	#1		;
-+	rts			;} // redrwok()
++	rts			;} // rejctok()
 
 animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
 	beq	drawsho		; if (HANDREM) {
@@ -616,7 +623,7 @@ animrej				;uint1_t animrej(void) {
 	iny			;
 	sty	DISCREM		;   DISCARD[DISCREM++] = HAND[x];
 	lda	#NONCARD	;
-	sta	HAND-1,x	;   HAND[x] = 0xff; // blank a 3x5 rectangle...
+	sta	HAND-1,x	;   HAND[x] = 0x09; // blank a 3x5 rectangle...
 	txa			;
 	pha			;
 	tya			;
@@ -627,7 +634,7 @@ animrej				;uint1_t animrej(void) {
 	lda	#NONCARD	;
 	ldy	inhandy		;
 	clc			;   // at that card's location:
-	jsr	cardsho		;   cardsho(0, 0xff, inhandx[x], inhandy[x]);
+	jsr	cardsho		;   cardsho(0, 0x09, inhandx[x], inhandy[x]);
 .endif
 	jsr	discsho		;   discsho(); // and show the card in the pile
 	pla			;
