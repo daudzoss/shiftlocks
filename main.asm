@@ -20,9 +20,6 @@ COPIED2	= $0400
 	.text	$aa,$41,$2c,$42	; + A , B
 	.text	$3a,$82,$00	; : NEXT
 +
-.endif
-
-.if 0
 	.word	(+), 2055
 	.text	$99,$22,$09,$8e	; PRINT " CHR$(9) CHR$(142)
 	.text	$08,$93,$13,$13	; CHR$(8) CHR$(147) CHR$(19) CHR$(19)
@@ -103,7 +100,7 @@ topline	.text	"the crime scene     "
 	.null	"   +       +",$22
 +	.word	(+),2055
 	.text	$99,$22
-	.text	" rules:",$22,$3b,$3a
+	.null	" rules:",$22,$3b
 .endif
 +	.word	(+),2055
 	.text	$9e
@@ -959,7 +956,7 @@ bckdrop	ldx	#bckdrop-petscii;void bckdrop(void) {
 	jsr	$ffd2		;
 	dex			;
 	bne	-		; printf("%c%c%c%c%c%c", 9, 147, 8, 19, 19);
-.if 1
+.if BASIC
 	ldy	#SCREENH	; for (register uint8_t y = SCREENH; y > 0; y--)
 -	ldx	#SCREENW	;  for (register uint8_t x = SCREENH; x > 0; x--)
 -	lda	#$20		;
