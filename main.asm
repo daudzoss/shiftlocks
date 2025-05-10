@@ -244,7 +244,6 @@ newhand	jsr	drw4hnd		;  do {
 
 getmove	jsr	$ffe4		;  do {
 	beq	getmove		;   a = getchar();
-
 	cmp	#DEL_KEY	;   if (a == DEL_KEY) {
 	bne	+		;
 	jsr	undomov		;    undomov();
@@ -259,8 +258,10 @@ getmove	jsr	$ffe4		;  do {
 	bcc	notfkey		;   } else if (a >= '1'
 	cmp	#'8'+1		;              &&
 	bcs	+		;              a < '9') {
+	pha			;
 	lda	#0		;
 	sta	TEMPVAR		;   TEMPVAR = 0;
+	pla			;
 	sec			;
 	sbc	#'1'		;    a -= '1'; // 0~7 even:crimescene,odd:office
 	lsr			;    // a:         0   1   2   3   4   5   6   7
@@ -268,9 +269,8 @@ getmove	jsr	$ffe4		;  do {
 -	rol	TEMPVAR		;    // (a&1)<<2:  0   4   0   4   0   4   0   4
 	dey			;    // a>>1:      0   0   1   1   2   2   3   3
 	bne	-		;    TEMPVAR = ((a & 1) << 2) | (a >> 1);
-	lda	TEMPVAR		;    a = TEMPVAR; // 0~3 crimescene, 4~7 office!
-	;sty	TEMPVAR		;    ;TEMPVAR = 0;
-	jmp trymove;beq	trymove		;
+	ora	TEMPVAR		;    a = TEMPVAR; // 0~3 crimescene, 4~7 office!
+	jmp	trymove		;
 
 +	cmp	#F1_KEY		;
 	bcc	notfkey		;   } else if (a >= F1_KEY
@@ -329,7 +329,6 @@ numleft	lda	NWOUNDS		;   }
 	jsr	snapsht		;   snapsht();
 	lda	HANDREM		;
 	beq	+		;
- brk
 	jmp	getmove		;  } while (HANDREM);
 +	jsr	gamewon		;
 	bne	mainend		;
@@ -808,7 +807,7 @@ rejmsg1	.byte	$a0,$90,$92,$85	;  PRE
 	.byte	$a0		;
 rejmsg2	
 
-	nop			;uint1_t warning(void) {
+	nop			;uint8_t warning(void) {
 warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("CANNOT PLAY THERE"/*RVS ON*/
 	beq	-		;         "PRESS Y FOR WOUND"/*RVS OFF*/, 17, 17,
@@ -816,8 +815,11 @@ warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
 	cmp	#$59		; register uint8_t a = getchar();
 	php			; handmsg(SCRATCH, 17, 15); // pop backing store
 	handmsg	SCRATCH,rejmsg1-rejmsg0,rejmsg2-rejmsg1
-	plp			; return (a == 'Y' || a == 'y'), a;
-	rts			;} // warning()
+	lda	#0		;
+	plp			;
+	bne	+		;
+	lda	#1		; return (a=='Y' || a=='y');// # wounds accepted
++	rts			;} // warning()
 wrnmsg0	.byte	$03,$01,$0e,$0e	; CANN
 	.byte	$0f,$14,$20,$10	; OT P
 	.byte	$0c,$01,$19,$20	; LAY
