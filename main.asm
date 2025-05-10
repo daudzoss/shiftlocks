@@ -288,41 +288,39 @@ trymove	pha			;
 	tay			;
 	lda	HAND,y		;
 	and	#$f8		;
-	beq	+		;   if (HAND[a] >= 8)
+	beq	+		;   if (HAND[a & 3] >= 8)
 	pla			;
 	jmp	getmove		;    continue; // already played that card
 +
 	pla			;
-;	pha			;
+	pha			;   uint8_t stack = a; // movedok() returns 1<<a
 	jsr	movedok		;   
 	bne	numleft		;   if (!movedok(a)) { //returns 1<<a if ok or 0
 	jsr	warning		;    if (warning() == 0 /* 0 wounds accepted */)
 	bne	acceptw		;
-;	pla			;
+	pla			;
 	beq	notfkey		;     continue;
-acceptw	inc	NWOUNDS		;    NWOUNDS++;
+acceptw	pla			;
+	and	#$03		;
+	tay			;
+	lda	#NONCARD	;
+	sta	HAND,y		;    HAND[stack & 3] = NONCARD;
+	dec	HANDREM		;    HANDREM--;
+	inc	NWOUNDS		;    NWOUNDS++;
 	digitxy	NWOUNDS,WDX,WDY	;    digitxy(NWOUNDS, WDX, WDY);
 numleft	lda	NWOUNDS		;   }
 	cmp	#$03		;
 	bcc	+		;   if (NWOUNDS >= 3)
-;	pla			;
 	bcs	mainend		;    exit(0);
 +
-;	pla			;
-;	bit	isoffic		;
-;	beq	+		;   if (a & 0x04)  // played to office
-;	dec	TOFFICE		;    TOFFICE--; // indicate use one of our two
-;	inc	TOSCENE		;   else
-;+	dec	TOSCENE		;    TSCENE--; // indicate use one of our two
-
 .if 0
-;	and	#$03		;
-;	tay			;
-;	ldx	inhandx,y	;
-;	ldy	inhandy		;
-;	clc			;
-;	lda	#NONCARD	;
-;	jsr	cardsho		;
+	and	#$03		;
+	tay			;
+	ldx	inhandx,y	;
+	ldy	inhandy		;
+	clc			;
+	lda	#NONCARD	;
+	jsr	cardsho		;
 .else
 	jsr	animhnd		;   animhnd(); // show the card as missing
 .endif
@@ -692,11 +690,10 @@ rejrtn4	clc			;
 	adc	#4		;
 rejrtn3	rts			;} // rejctok()
 
-animhnd	ldx	HANDREM		;void animhnd(void) { // just paint them for now
-	beq	drawsho		; if (HANDREM) {
--	txa			;  for (register int8_t x = HANDREM; x>=0; x--){
-	pha			;
-	lda	HAND-1,x	;   register int8_t a = HAND[x];
+animhnd	ldx	#4		;void animhnd(void) { // just paint them for now
+-	txa			;
+	pha			; for (register int8_t x = 4; x>=0; x--) {
+	lda	HAND-1,x	;  register int8_t a = HAND[x];
 	pha			;
 	lda	inhandx-1,x	;
 	tax			;
