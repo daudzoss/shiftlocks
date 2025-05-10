@@ -22,6 +22,7 @@ COPIED2	= $0400
 +
 .endif
 
+.if 0
 	.word	(+), 2055
 	.text	$99,$22,$09,$8e	; PRINT " CHR$(9) CHR$(142)
 	.text	$08,$93,$13,$13	; CHR$(8) CHR$(147) CHR$(19) CHR$(19)
@@ -102,8 +103,10 @@ topline	.text	"the crime scene     "
 	.null	"   +       +",$22
 +	.word	(+),2055
 	.text	$99,$22
-	.text	" rules:",$22,$3b
-	.text	$3a,$9e
+	.text	" rules:",$22,$3b,$3a
+.endif
++	.word	(+),2055
+	.text	$9e
 	.null	format("%4d",main)
 +	.word	0
 
@@ -218,11 +221,12 @@ main	lda	#0		;void main (void) {
 	sta	DISCREM		;
 	sta	HANDREM		;
 	sta	NWOUNDS		; NWOUNDS = DISCREM = HANDREM = 0;
-	digitxy	NWOUNDS,WDX,WDY	; digitxy(NWOUNDS, WDX, WDY);
+	jsr	bckdrop		; bckdrop(); // draw most of the scren
 	jsr	finishr		; finishr(); // rule/ability text and card color
-	jsr	discsho		; discsho();
-	jsr	initstk		; initstk();
-	jsr	animshf		; animshf();
+	digitxy	NWOUNDS,WDX,WDY	; digitxy(NWOUNDS, WDX, WDY); // set wounds to 0
+	jsr	discsho		; discsho(); // show the empty discard pile
+	jsr	initstk		; initstk(); // empty the crime scene and office
+	jsr	animshf		; animshf(); // shuffle deck briefly onscreen
 
 	nop			; do {
 newhand	jsr	drw4hnd		;  do {
@@ -279,9 +283,9 @@ getmove	jsr	$ffe4		;  do {
 	sec			;
 	sbc	#F1_KEY		;    a -= F1_KEY - 1;// 0~3 crimescene, 4~7 as ^
 	jmp trymove;bcs	trymove		;
-	
+
 notfkey	jmp	getmove		;   } else continue;
-	
+
 trymove	pha			;
 	and	#$03		;
 	tay			;
@@ -313,7 +317,7 @@ numleft	lda	NWOUNDS		;   }
 ;	dec	TOFFICE		;    TOFFICE--; // indicate use one of our two
 ;	inc	TOSCENE		;   else
 ;+	dec	TOSCENE		;    TSCENE--; // indicate use one of our two
-	
+
 .if 0
 ;	and	#$03		;
 ;	tay			;
@@ -325,7 +329,7 @@ numleft	lda	NWOUNDS		;   }
 .else
 	jsr	animhnd		;   animhnd(); // show the card as missing
 .endif
-	
+
 	jsr	snapsht		;   snapsht();
 	lda	HANDREM		;
 	beq	+		;
@@ -348,7 +352,7 @@ scenem	dec	TOSCENE		;  if (TOSCENE-- == 0) // didn't already play 2
 	lda	#0		;
 	sta	TOSCENE		;   return a = TOSCENE = 0; // z set
 	beq	notmove		; }
-	
+
 handgap	pha			;
 	and	#$03		;
 	tay			;
@@ -479,7 +483,7 @@ blankit	lda	#$a0		;
 	jsr	selfsho		;  selfsho(0xa0, y = 1);
 	dey			;  selfsho(0xa0, y = 0);
 	jsr	selfsho		; }
-	
+
 +	plp			; y = 0;
 	bcs	+		; if (c || // caller explicitly requested a top
 	lda	1+selfsha	;
@@ -819,7 +823,8 @@ warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
 	plp			;
 	bne	+		;
 	lda	#1		; return (a=='Y' || a=='y');// # wounds accepted
-+	rts			;} // warning()
++	and	#$ff		;
+	rts			;} // warning()
 wrnmsg0	.byte	$03,$01,$0e,$0e	; CANN
 	.byte	$0f,$14,$20,$10	; OT P
 	.byte	$0c,$01,$19,$20	; LAY
@@ -832,6 +837,145 @@ wrnmsg1	.byte   $90,$92,$85,$93 ; PRES
 	.byte	$84		; D
 wrnmsg2
 
+
+	.byte	$00,$00,(+)-*-3	; (0,0)
+b_label	.byte	$14,$08,$05,$20	; THE 
+	.byte	$03,$12,$09,$0d	; CRIM 
+	.byte	$05,$20,$13,$03	; E SC
+	.byte	$05,$0e,$05,$20	; ENE
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$13,$08	;   SH
+	.byte	$09,$06,$14,$0c	; IFTL
+	.byte	$0f,$03,$0b,$27	; OCK'
+	.byte	$13,$20,$0f,$06	; S OF
+	.byte	$06,$09,$03,$05	; FICE
+
++
+.if 1
+	.byte	$11,$05,(+)-*-3	; (17,5)
+b_arwup	.byte	$4e		; /
++
+.else
+	.byte	$11,$04,(+)-*-3	; (17,4)
+b_arwup	.byte	$64,$20,$20,$20	; _
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$4e,$65		; /[
++	
+.endif
+
++	.byte	$04,$06,(+)-*-3	; (4,6)
+b_threa	.byte	$14,$08,$12,$05	; THRE
+	.byte	$01,$14,$13,$20	; ATS
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$04,$09,$13	;  DIS
+	.byte	$2d		; -
+
++	.byte	$03,$07,(+)-*-3	; (3,7)
+b_wound	.byte	$97,$8f,$95,$8e	; WOUN
+	.byte	$84,$93,$ba,$a0	; DS:
+	.byte	$bf,$20,$20,$20	; ?
+	.byte	$20,$20,$03,$01	;   CA
+	.byte	$12,$04		; RD
+
++	.byte	$01,$08,(+)-*-3	; (1,8)
+b_inves	.byte	$09,$0e,$16,$05	; INVE
+	.byte	$13,$14,$09,$07	; STIG
+	.byte	$01,$14,$09,$0f	; ATIO
+	.byte	$0e,$13		; NS
+
++	.byte	$11,$09,(+)-*-3	; (17,9)
+b_dpile	.byte	$10,$09,$0c,$05	; PILE
+
++	.byte	$12,$0c,(+)-*-3	; (18,12)
+b_draw	.byte	$04,$12,$01,$17	; DRAW
+
++	.byte	$12,$0e,(+)-*-3	; (18,14)
+b_deck	.byte	$04,$05,$03,$0b	; DECK
+
++	.byte	$01,$0f,(+)-*-3	; (1,15)
+b_fodds	.byte	$1e,$06,$31,$20	; ^F1 
+	.byte	$1e,$06,$33,$20	; ^F3
+	.byte	$1e,$06,$35,$20	; ^F5
+	.byte	$1e,$06,$37,$20	; ^F7
+
++
+.if 1
+	.byte	$15,$0f,(+)-*-3	; (21,15)
+b_arwdn	.byte	$4e		; /
++
+.else
+	.byte	$14,$0f,(+)-*-3	; (20,15)
+b_arwdn	.byte	$67,$43,$20,$20	; ]/
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$77		; ^
++
+.endif
+
++	.byte	$01,$15,(+)-*-3	; (1,21)
+b_feven	.byte	$06,$32,$40,$20	; F2-
+	.byte	$06,$34,$40,$20	; F4-
+	.byte	$06,$36,$40,$20	; F6-
+	.byte	$06,$38,$40,$20	; F8-
+	.byte	$14,$0f,$20,$13	; TO S
+	.byte	$0f,$0c,$16,$05	; OLVE
+	.byte	$3a,$20		; :
+
++	.byte	$00,$17,(+)-*-3	;
+b_pairg	.byte	$10,$01,$09,$12	; PAIR
+	.byte	$09,$0e,$07,$20	; ING 
+	.byte	$20,$20,$20,$2b	;    +
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$2b	;    +
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$2b	;    +
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$2b	;    +
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$12,$15,$0c	;  RUL
+	.byte	$05,$13,$3a,$20	; ES:
++
+	
+petscii	.text	$09,$83,$08	; enable upper/lower case, uppercase, lock upper
+	.text	$13,$13		; clear any BASIC 3.5/4 subwindows on the screen
+
+bckdrop	ldx	#bckdrop-petscii;void bckdrop(void) {
+-	lda	petscii,x	;
+	jsr	$ffd2		;
+	dex			;
+	bne	-		; printf("%c%c%c%c%c%c", 9, 147, 8, 19, 19);
+.if 1
+	ldy	#SCREENH	; for (register uint8_t y = SCREENH; y > 0; y--)
+-	ldx	#SCREENW	;  for (register uint8_t x = SCREENH; x > 0; x--)
+-	lda	#$20		;
+	jsr	$ffd2		;   printf(" ");
+	dex			;
+	bne	-		;
+	dey			;
+	bne	--		;
+.endif
+	.for s in b_label,b_arwup,b_threa,b_wound,b_inves,b_dpile,b_draw,b_deck,b_fodds,b_arwdn,b_feven,b_pairg
+	 ldx	s-3		; 
+	 ldy	s-2		;
+	 lda	s-1		; for (i = 0; i < SLEN; i++)
+	printxy	s		;  printxy(s[i], x=s[i]-1, y=s[i]-2, a=s[i]-3);
+	.next
+	rts			;}
 pre_end
 .align	$80
 vararea
