@@ -294,7 +294,7 @@ trymove	pha			;
 	pha			;
 	jsr	movedok		;   
 	bne	numleft		;   if (!movedok(a)) { //returns 1<<a if ok or 0
-;	jsr	warning		;    if (warning() == 0 /* 0 wounds accepted */)
+	jsr	warning		;    if (warning() == 0 /* 0 wounds accepted */)
 	bne	acceptw		;
 	pla			;
 	beq	notfkey		;     continue;
@@ -751,13 +751,13 @@ cardout	clc			;void cardout(register uint8_t& x,
 	bne	-		; }
 	rts			;} // cardout()
 
-animrej				;uint1_t animrej(void) {
-	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
+	nop			;uint1_t animrej(void) {
+animrej	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("DISCARD & REDRAW?"/*RVS ON*/
-	beq	-		;          "PRESS Y FOR YES"/*RVS OFF*/, 17, 15
+	beq	-		;         " PRESS Y FOR YES "/*RVS OFF*/, 17, 17,
 	and	#$df		;         SCRATCH);
 	cmp	#$59		; register uint8_t a = getchar();
-	php			; handmsg(SCRATCH, 17, 15); // pop backing store
+	php			; handmsg(SCRATCH, 17, 17); // pop backing store
 	handmsg	SCRATCH,rejmsg1-rejmsg0,rejmsg2-rejmsg1
 	plp			;
 	php			;
@@ -790,18 +790,43 @@ animrej				;uint1_t animrej(void) {
 	dex			;   HANDREM--;
 	bne	-		;  }
 	stx	HANDREM		; }
-+	plp			; return a == 'Y' || a == 'y';
++	plp			; return a == 'Y' || a == 'y', a = 1;
 	rts			;} // animrej()
 rejmsg0	.byte	$04,$09,$13,$03	; DISC
 	.byte	$01,$12,$04,$20	; ARD 
 	.byte	$26,$20,$12,$05	; & RE
 	.byte	$04,$12,$01,$17	; DRAW
 	.byte	$3f		; ?
-rejmsg1	.byte	$90,$92,$85,$93	; PRES
-	.byte	$93,$a0,$99,$a0	; S Y 
-	.byte	$86,$8f,$92,$a0	; FOR
-	.byte	$99,$85,$93	; YES
+rejmsg1	.byte	$a0,$90,$92,$85	;  PRE
+	.byte	$93,$93,$a0,$99	; SS Y 
+	.byte	$a0,$86,$8f,$92	;  FOR
+	.byte	$a0,$99,$85,$93	;  YES
+	.byte	$a0		;
 rejmsg2	
+
+	nop			;uint1_t warning(void) {
+warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
+-	jsr	$ffe4		; handmsg("CANNOT PLAY THERE"/*RVS ON*/
+	beq	-		;         "PRESS Y FOR WOUND"/*RVS OFF*/, 17, 17,
+	and	#$df		;         SCRATCH);
+	cmp	#$59		; register uint8_t a = getchar();
+	php			; handmsg(SCRATCH, 17, 15); // pop backing store
+	handmsg	SCRATCH,rejmsg1-rejmsg0,rejmsg2-rejmsg1
+	plp			;
+	bne	+		; return (a == 'Y' || a == 'y'), a;
++	plp			;
+	rts			;} // warning()
+wrnmsg0	.byte	$03,$01,$0e,$0e	; CANN
+	.byte	$0f,$14,$20,$10	; OT P
+	.byte	$0c,$01,$19,$20	; LAY
+	.byte	$14,$08,$05,$12	; THER
+	.byte	$05		; E
+wrnmsg1	.byte   $90,$92,$85,$93 ; PRES
+	.byte   $93,$a0,$99,$a0 ; S Y 
+	.byte   $86,$8f,$92,$a0 ; FOR
+	.byte	$90,$8f,$95,$8e	; WOUN
+	.byte	$84		; D
+wrnmsg2
 
 pre_end
 .align	$80

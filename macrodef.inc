@@ -77,8 +77,9 @@ handmsg	.macro s1s2,s1l,s2l,bck=0;inline void handmsg(uint8_t* s1s2,uint8_t s1l,
 	ldx	#6		;
 -	iny			;
 	dex			;// 15 characters centered within row below hand
-	bne	-		; y = inhandy[0] + 6;
-	ldx	inhandx		; x = inhandx[0];
+	bne	-		;
+	ldx	inhandx		; y = inhandy[0] + 6;
+	dex			; x = inhandx[0] - 1;
 	lda	#\s2l		; a = s2l; // length of string 2 imm. following
 	txtclip	\bck+\s1l	; txtclip(x, y, a, SCRATCH + CLP1SZ);
 	lda	#\s2l		; a = s2l; // length of string 2 imm. following
