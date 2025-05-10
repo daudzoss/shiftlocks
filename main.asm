@@ -290,36 +290,38 @@ trymove	pha			;
 	beq	+		;   if (HAND[a] >= 8)
 	pla			;
 	jmp	getmove		;    continue; // already played that card
-+	pla			;
-	pha			;
++
+	pla			;
+;	pha			;
 	jsr	movedok		;   
 	bne	numleft		;   if (!movedok(a)) { //returns 1<<a if ok or 0
 	jsr	warning		;    if (warning() == 0 /* 0 wounds accepted */)
 	bne	acceptw		;
-	pla			;
+;	pla			;
 	beq	notfkey		;     continue;
 acceptw	inc	NWOUNDS		;    NWOUNDS++;
 	digitxy	NWOUNDS,WDX,WDY	;    digitxy(NWOUNDS, WDX, WDY);
 numleft	lda	NWOUNDS		;   }
 	cmp	#$03		;
 	bcc	+		;   if (NWOUNDS >= 3)
-	pla			;
+;	pla			;
 	bcs	mainend		;    exit(0);
-+	pla			;
-	bit	isoffic		;
-	beq	+		;   if (a & 0x04)  // played to office
-	dec	TOFFICE		;    TOFFICE--; // indicate use one of our two
-	inc	TOSCENE		;   else
-+	dec	TOSCENE		;    TSCENE--; // indicate use one of our two
++
+;	pla			;
+;	bit	isoffic		;
+;	beq	+		;   if (a & 0x04)  // played to office
+;	dec	TOFFICE		;    TOFFICE--; // indicate use one of our two
+;	inc	TOSCENE		;   else
+;+	dec	TOSCENE		;    TSCENE--; // indicate use one of our two
 	
-.if 1
-	and	#$03		;
-	tay			;
-	ldx	inhandx,y	;
-	ldy	inhandy		;
-	clc			;
-	lda	#NONCARD	;
-	jsr	cardsho		;
+.if 0
+;	and	#$03		;
+;	tay			;
+;	ldx	inhandx,y	;
+;	ldy	inhandy		;
+;	clc			;
+;	lda	#NONCARD	;
+;	jsr	cardsho		;
 .else
 	jsr	animhnd		;   animhnd(); // show the card as missing
 .endif
@@ -327,6 +329,7 @@ numleft	lda	NWOUNDS		;   }
 	jsr	snapsht		;   snapsht();
 	lda	HANDREM		;
 	beq	+		;
+ brk
 	jmp	getmove		;  } while (HANDREM);
 +	jsr	gamewon		;
 	bne	mainend		;
@@ -339,12 +342,12 @@ movedok	bit	officem		;uint8_t moveok(register uint8_t& a) {
 	dec	TOFFICE		;  if (TOFFICE-- == 0) // didn't already play 2
 	bpl	handgap		;//FIXME:need to check compatibility of pile too
 	lda	#0		;
-	sta	TOFFICE		;   return a = TOFFICE = 0;
+	sta	TOFFICE		;   return a = TOFFICE = 0; // z set
 	beq	notmove		; } else { // trying dec TOSCENE, less stringent
 scenem	dec	TOSCENE		;  if (TOSCENE-- == 0) // didn't already play 2
 	bpl	handgap		;
 	lda	#0		;
-	sta	TOSCENE		;   return a = TOSCENE = 0;
+	sta	TOSCENE		;   return a = TOSCENE = 0; // z set
 	beq	notmove		; }
 	
 handgap	pha			;
@@ -360,8 +363,9 @@ handgap	pha			;
 	sec			;
 -	rol			;
 	dey			;
-	bne	-		; return 1<<a;
-notmove	rts			;} // moveok()
+	bne	-		; return 1<<a; // z clear
+	and	#$ff		;
+notmove	rts			;} // movedok()
 
 
 finishr	lda	#0		;void finishr(void) {
@@ -812,9 +816,7 @@ warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
 	cmp	#$59		; register uint8_t a = getchar();
 	php			; handmsg(SCRATCH, 17, 15); // pop backing store
 	handmsg	SCRATCH,rejmsg1-rejmsg0,rejmsg2-rejmsg1
-	plp			;
-	bne	+		; return (a == 'Y' || a == 'y'), a;
-+	plp			;
+	plp			; return (a == 'Y' || a == 'y'), a;
 	rts			;} // warning()
 wrnmsg0	.byte	$03,$01,$0e,$0e	; CANN
 	.byte	$0f,$14,$20,$10	; OT P
@@ -824,7 +826,7 @@ wrnmsg0	.byte	$03,$01,$0e,$0e	; CANN
 wrnmsg1	.byte   $90,$92,$85,$93 ; PRES
 	.byte   $93,$a0,$99,$a0 ; S Y 
 	.byte   $86,$8f,$92,$a0 ; FOR
-	.byte	$90,$8f,$95,$8e	; WOUN
+	.byte	$97,$8f,$95,$8e	; WOUN
 	.byte	$84		; D
 wrnmsg2
 
