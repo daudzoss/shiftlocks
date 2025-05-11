@@ -4,7 +4,7 @@
 *	= BASIC+1
 .else
 *	= $0002+1
-COPIED2	= $0400
+COPIED2	= $8000
 	.word	(+), 3
 	.text	$81,$41,$b2,$30	; FOR A = 0
 	.text	$a4		; TO prefld-start
@@ -129,7 +129,9 @@ STACKHT	= UNDOABL + $00		; 0-3 invest, 4-7 threat, 8-11 office
 HAND	= UNDOABL + $0c		;
 DISCARD	= UNDOABL + $10
 DECK	= DISCARD + DECKSIZ
-UNDOABH	= DISCARD + 2*DECKSIZ	; should always be 0 or 4?
+ODRAWER	= DISCARD + 2*DECKSIZ	; +0~15 1's, 16~31 2's, 32~47 3's,...
+
+UNDOABH	= DISCARD + 2*DECKSIZ  + 4*(8+8)
 HANDREM = UNDOABH + 0
 DISCREM	= UNDOABH + 1
 DECKREM	= UNDOABH + 2
@@ -139,7 +141,7 @@ MOVEPWR	= UNDOABH + $d
 TOSCENE	= UNDOABH + $e
 TOFFICE	= UNDOABH + $f
 
-UNSAVED	= vararea + $80
+UNSAVED	= vararea + $100
 .if UNSAVED <= TOFFICE
 .error "saved variables crashed into ceiling, obliterated UNSAVED"
 .endif
@@ -260,7 +262,7 @@ getmove	jsr	$ffe4		;  do {
 	cmp	#'8'+1		;              &&
 	bcs	+		;              a < '9') {
 	ldy	#0		;
-	sty	TEMPVAR		;   TEMPVAR = 0;
+	sty	TEMPVAR		;    TEMPVAR = 0;
 	sec			;
 	sbc	#'1'		;    a -= '1'; // 0~7 even:crimescene,odd:office
 	lsr			;    // a:         0   1   2   3   4   5   6   7
@@ -268,7 +270,8 @@ getmove	jsr	$ffe4		;  do {
 -	rol	TEMPVAR		;    // (a&1)<<2:  0   4   0   4   0   4   0   4
 	dey			;    // a>>1:      0   0   1   1   2   2   3   3
 	bne	-		;    TEMPVAR = ((a & 1) << 2) | (a >> 1);
-	ora	TEMPVAR		;    a = TEMPVAR; // 0~3 crimescene, 4~7 office!
+	ora	TEMPVAR		;    a |= TEMPVAR; // 0~3 crimescene, 4~7 office
+	sta	MOVESEL		;    MOVESEL = a;
 	jmp	trymove		;
 
 +	cmp	#F1_KEY		;
@@ -277,33 +280,28 @@ getmove	jsr	$ffe4		;  do {
 	bcs	notfkey		;              a < F1_KEY+8) {
 	sec			;
 	sbc	#F1_KEY		;    a -= F1_KEY - 1;// 0~3 crimescene, 4~7 as ^
-	jmp trymove;bcs	trymove		;
+	sta	MOVESEL		;    MOVESEL = a;
+	jmp	trymove		;
 
 notfkey	jmp	getmove		;   } else continue;
 
-trymove	pha			; FIXME: just use a variable MOVESEL XSto make pha/pla less convoluted
-	and	#$03		;
+trymove	and	#$03		;
 	tay			;
 	lda	HAND,y		;
-	and	#$f8		;
-	beq	+		;   if (HAND[a & 3] >= 8)
-	pla			;
+	cmp	#8		;
+	bcc	+		;   if (HAND[MOVESEL & 3] >= 8)
 	jmp	getmove		;    continue; // already played that card
-+	pla			;
-	pha			;   uint8_t stack = a; // movedok() returns 1<<a
-	jsr	movedok		;   
-	bne	numleft		;   if (!movedok(a)) { //returns 1<<a if ok or 0
++	lda	MOVESEL		;
+	jsr	movedok		;   // movedok() returns 1<<MOVESEL if ok else 0
+	bne	numleft		;   if (!movedok(MOVESEL)) {
 	jsr	warning		;    if (warning() == 0 /* 0 wounds accepted */)
 	bne	acceptw		;
-	pla			;
 	jmp	notfkey		;     continue;
-acceptw	pla			;
-	pha			;
-	and	#$03		;
-	tay			;
-	lda	#NONCARD	;
-	sta	HAND,y		;    HAND[stack & 3] = NONCARD;
-	dec	HANDREM		;    HANDREM--;
+acceptw	lda	MOVESEL		;
+	jsr	fromhnd		;
+	ldy	DISCREM		;
+	sta	DISCARD,y	;    DISCARD[DISCREM] = fromhnd(MOVESEL);
+	inc	DISCREM		;    DISCREM++;
 	inc	NWOUNDS		;    NWOUNDS++;
 	digitxy	NWOUNDS,WDX,WDY	;    digitxy(NWOUNDS, WDX, WDY);
 numleft	pla			;
@@ -333,28 +331,92 @@ numleft	pla			;
 	jmp	newhand		; } while (!gamewon());
 mainend	rts			;} // main()
 
-officem	.byte	$f0		;
-movedok	bit	officem		;uint8_t moveok(register uint8_t& a) {
-	beq	scenem		; if (a & 0xf0) { // trying dec TOFFICE, compat?
-	dec	TOFFICE		;  if (TOFFICE-- == 0) // didn't already play 2
-	bpl	handgap		;//FIXME:need to check compatibility of pile too
+fromhnd	and	#$03		;uint8_t fromhnd(register uint2_t a) {
+	tay			; uint8_t retval; // took HAND index 0 ~ 3
+fasthnd	lda	HAND,y		; retval = HAND[a & 0x03]; //in here if y passed
+	cmp	#NONCARD	;
+	bcs	+		; if (retval < NONCARD) {
+	ldx	#NONCARD	;  HAND[a & 0x03] = NONCARD;
+	stx	HAND,y		;  HANDREM--;
+	dec	HANDREM		; }
++	and	#$ff		; return retval; // returned card 0 ~ 7, 8 empty
+	rts			;} // fromhnd()
+
+intohnd	and	#$07		;intohnd(register uint3_t a)  {
+	ldy	#4		; register int8_t x, y; // took card 0 ~ 7
+-	ldx	HAND-1,y	; for (y = 3; y >= 0; y--) {
+	cpx	#NONCARD	;  if (HAND[y] >= NONCARD) // empty slot found
+	bcs	+		;   break;
+	dey			;
+	bne	-		;
+	dey			; if (y < 0)
+	bmi	++		;  return -1; // returned negative if hand full
++	sta	HAND-1,y	; HAND[y] = a;
+	inc	HANDREM		; HANDREM++;
+	tya			; return y; // returned HAND index 0 ~ 3
++	rts			;} // intohnd()
+
+officem
+threatm
+	.byte	$04		;
+tisnext	.byte	$01		;
+movedok	bit	officem		;uint8_t moveok(register uint8_t& a) {// 0~3 crimescene, 4~7 office
+	beq	scenem		; if (a & 0x04) { // trying dec TOFFICE first,
+	dec	TOFFICE		;               // will inc it back if incompat
+	bpl	+		;  if (--TOFFICE < 0) // already played 2 cards
 	lda	#0		;
-	sta	TOFFICE		;   return a = TOFFICE = 0; // z set
-	beq	notmove		; } else { // trying dec TOSCENE, less stringent
+	sta	TOFFICE		;
+	beq	notmove		;   return a = TOFFICE = 0; // z set
++	and	#$03		;
+	tay			;  register uint2_t y = a & 0x03; // hand slot
+	lda	HAND,y		;  a = HAND[y]; // card 0 ~ 7
+	pha			;
+	and	#$03		;
+	tax			;  register uint2_t x = a & 0x03; // office slot
+	pla			;
+	bit	threatm		;
+	beq	+		;  if (a & 0x04) {//only threat card gets prompt
+	
+
+
++	lda	STACKHT+8,x	;  } else { // trying to play investigation card
+	bit	tisnext		;   // which alternate so need stack height even  
+	beq	+		;   if (STACKHT[8+x] & 1) {// but inv is showing
+	inc	TOFFICE		;    TOFFICE++;
+	lda	#0		;    return a = 0;
+	beq	notmove		;   }
++	pha			;
+	txa			;
+	asl			;
+	asl			;
+	asl			;
+	asl			;
+	clc			;    //stack#, position in stack
+	adc	STACKHT+8,x	;   a = x<<4 + STACKHT[8+x];
+	inc	STACKHT+8,x	;   STACKHT[8+x]++; // increase before x clobber
+	pha			;
+	jsr	fasthnd		;  
+	sta	TEMPVAR		;   TEMPVAR = fasthnd(y);// card taken from hand
+	pla			;
+	tax			;   x = a;
+	lda	TEMPVAR		;
+	sta	ODRAWER,x	;   ODRAWER[x] = TEMPVAR;// and placed in drawer
+	pla			;
+	jmp	movepwr		; } else { // trying dec TOSCENE, less stringent
 scenem	dec	TOSCENE		;  if (TOSCENE-- == 0) // didn't already play 2
 	bpl	handgap		;
 	lda	#0		;
 	sta	TOSCENE		;   return a = TOSCENE = 0; // z set
 	beq	notmove		; }
-
-handgap	pha			;
-	and	#$03		;
-	tay			;
-	lda	#NONCARD	;//FIXME:need to update the new location of card
-	sta	HAND,y		; HAND[a & 0x03] = NONCARD;
-	dec	HANDREM		; HANDREM--;
-	pla			;
-	tay			;
+	
+;handgap	pha			;//FIXME:deprecate all this in favor of fromhnd
+;	and	#$03		;
+;	tay			;
+;	lda	#NONCARD	;//FIXME:need to update the new location of card
+;	sta	HAND,y		; HAND[a & 0x03] = NONCARD;
+;	dec	HANDREM		; HANDREM--;
+;	pla			;
+movepwr	tay			;
 	iny			;
 	lda	#0		;
 	sec			;
@@ -974,7 +1036,7 @@ bckdrop	ldx	#bckdrop-petscii;void bckdrop(void) {
 	.next
 	rts			;}
 pre_end
-.align	$80
+.align	UNSAVED-UNDOABL
 vararea
 .align	$100	
 undobuf
