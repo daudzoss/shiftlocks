@@ -111,8 +111,8 @@ topline	.text	"the crime scene     "
 *	= COPIED2
 .endif
 
-.include "gamerule.asm"		; tosolve, solvlen
-.include "playeras.asm"		; abillen, ability
+.include "gamerule.asm"		; tosolve, solvlen, gamewon()
+.include "playeras.asm"		; ability, abillen, invest2()
 
 SCREEND	= SCREENC-SCREENM
 SCRSIZE	= SCREENW*SCREENH
@@ -137,7 +137,7 @@ DISCREM	= UNDOABH + 1
 DECKREM	= UNDOABH + 2
 NWOUNDS	= UNDOABH + 3
 HANDFOM	= UNDOABH + $c
-MOVEPWR	= UNDOABH + $d
+MOVESEL	= UNDOABH + $d
 TOSCENE	= UNDOABH + $e
 TOFFICE	= UNDOABH + $f
 
@@ -336,8 +336,10 @@ fromhnd	and	#$03		;uint8_t fromhnd(register uint2_t a) {
 fasthnd	lda	HAND,y		; retval = HAND[a & 0x03]; //in here if y passed
 	cmp	#NONCARD	;
 	bcs	+		; if (retval < NONCARD) {
-	ldx	#NONCARD	;  HAND[a & 0x03] = NONCARD;
-	stx	HAND,y		;  HANDREM--;
+	pha			;
+	lda	#NONCARD	;  HAND[a & 0x03] = NONCARD;
+	sta	HAND,y		;  HANDREM--;
+	pla			;
 	dec	HANDREM		; }
 +	and	#$ff		; return retval; // returned card 0 ~ 7, 8 empty
 	rts			;} // fromhnd()
@@ -358,15 +360,15 @@ intohnd	and	#$07		;intohnd(register uint3_t a)  {
 
 officem
 threatm
-	.byte	$04		;
-tisnext	.byte	$01		;
-movedok	bit	officem		;uint8_t moveok(register uint8_t& a) {// 0~3 crimescene, 4~7 office
+	.byte	$04		;// card 0~3 crimescene, 4~7 office
+tisnext	.byte	$01		;// height LSB 0 invest next, 1 threat next
+movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	beq	scenem		; if (a & 0x04) { // trying dec TOFFICE first,
-	dec	TOFFICE		;               // will inc it back if incompat
+	dec	TOFFICE		;                // will inc it back if invalid
 	bpl	+		;  if (--TOFFICE < 0) // already played 2 cards
 	lda	#0		;
 	sta	TOFFICE		;
-	beq	notmove		;   return a = TOFFICE = 0; // z set
+	jmp	notmove		;   return a = TOFFICE = 0; // z set
 +	and	#$03		;
 	tay			;  register uint2_t y = a & 0x03; // hand slot
 	lda	HAND,y		;  a = HAND[y]; // card 0 ~ 7
@@ -402,22 +404,38 @@ movedok	bit	officem		;uint8_t moveok(register uint8_t& a) {// 0~3 crimescene, 4~
 	lda	TEMPVAR		;
 	sta	ODRAWER,x	;   ODRAWER[x] = TEMPVAR;// and placed in drawer
 	pla			;
-	jmp	movepwr		; } else { // trying dec TOSCENE, less stringent
-scenem	dec	TOSCENE		;  if (TOSCENE-- == 0) // didn't already play 2
-	bpl	handgap		;
+	jmp	movepwr		; } else { // trying dec TOSCENE, always valid
+scenem	dec	TOSCENE		;
+	bpl	+		;  if (--TOSCENE < 0) // already played 2 cards
 	lda	#0		;
-	sta	TOSCENE		;   return a = TOSCENE = 0; // z set
-	beq	notmove		; }
-	
-;handgap	pha			;//FIXME:deprecate all this in favor of fromhnd
-;	and	#$03		;
-;	tay			;
-;	lda	#NONCARD	;//FIXME:need to update the new location of card
-;	sta	HAND,y		; HAND[a & 0x03] = NONCARD;
-;	dec	HANDREM		; HANDREM--;
-;	pla			;
-movepwr	tay			;
+	sta	TOSCENE		;
+	beq	notmove		;   return a = TOSCENE = 0; // z set
++	jsr	fasthnd		;  a = fasthnd();
+	tax			;  register uint2_t x = a; // scene slot
+	inc	STACKHT,x	;  STACKHT[x]++; // equivalent to placing a card
+	ldy	STACKHT,x	;
+	cpy	#2		;
+	beq	+		;
+	jmp	movepwr		;  if (STACKHT[x] == 2) {
++	ldy	DISCREM		;   // discard both cards that have accumulated
+	sta	DISCARD,y	;
+	iny			;   DISCARD[DISCREM++] = a;
+	;sty	DISCREM		;
+	sta	DISCARD,y	;
 	iny			;
+	sty	DISCREM		;   DISCARD[DISCREM++] = a;
+	bit	threatm		;
+	beq	+		;   if (a & 0x04) {// threat card, won't cascade
+	inc	NWOUNDS		;    NWOUNDS++;
+	pha			;
+	digitxy	NWOUNDS,WDX,WDY	;    digitxy(NWOUNDS, WDX, WDY);
+	pla			;
+	jmp	movepwr		;   } else {
++	pha			;// FIXME: are we as movedok() even re-entrant??
+	jsr	invest2		;    invest2(a); // defined in playeras.asm link
+	pla			;   }
+movepwr	tay			;  }
+	iny			; }
 	lda	#0		;
 	sec			;
 -	rol			;
@@ -876,8 +894,8 @@ warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
 	beq	-		;         "PRESS Y FOR WOUND"/*RVS OFF*/, 17, 17,
 	and	#$df		;         SCRATCH);
 	cmp	#$59		; register uint8_t a = getchar();
-	php			; handmsg(SCRATCH, 17, 15); // pop backing store
-	handmsg	SCRATCH,rejmsg1-rejmsg0,rejmsg2-rejmsg1
+	php			; handmsg(SCRATCH, 17, 17); // pop backing store
+	handmsg	SCRATCH,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1
 	lda	#0		;
 	plp			;
 	bne	+		;
@@ -896,6 +914,32 @@ wrnmsg1	.byte   $90,$92,$85,$93 ; PRES
 	.byte	$84		; D
 wrnmsg2
 
+
+				;//FIXME: move this over on the right by office
+	nop			;uint8_t oprompt(void) {
+oprompt	handmsg	offmsg0,offmsg1-offmsg0,offmsg2-offmsg1,SCRATCH
+-	jsr	$ffe4		; handmsg("TO WHICH PILE 1-4?"/*RVS ON*/
+	beq	-		;         "PRESS 0 TO CANCEL"/*RVS OFF*/, 18, 17,
+	and	#$df		;         SCRATCH);
+	cmp	#$59		; register uint8_t a = getchar();
+	php			; handmsg(SCRATCH, 17, 15); // pop backing store
+	handmsg	SCRATCH,offmsg1-offmsg0,offmsg2-offmsg1
+	lda	#0		;
+	plp			;
+	bne	+		;
+	lda	#1		; return (a=='Y' || a=='y');// # wounds accepted
++	and	#$ff		;
+	rts			;} // warning()
+offmsg0	.byte	$02,$0c,$01,$08	; BLAH
+	.byte	$02,$0c,$01,$08	; BLAH
+	.byte	$02,$0c,$01,$08	; BLAH
+	.byte	$02,$0c,$01,$08	; BLAH
+offmsg1	.byte   $90,$92,$85,$93 ; PRES
+	.byte   $93,$a0,$b0,$a0 ; S 0 
+	.byte   $86,$8f,$92,$a0 ; FOR
+	.byte	$97,$8f,$95,$8e	; WOUN
+	.byte	$84		; D
+offmsg2
 
 	.byte	$00,$00,(+)-*-3	; (0,0)
 b_label	.byte	$14,$08,$05,$20	; THE 

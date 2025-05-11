@@ -9,3 +9,5 @@ ability	.byte	$09,$0e,$16,$05	; INVE
 	.byte	$06,$09,$0e,$04	; FIND
 	.byte	$20,$0f,$0e,$05	;  ONE
 abiltxt
+
+invest2	rts

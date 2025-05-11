@@ -9,3 +9,5 @@ ability	.byte	$14,$08,$12,$05	; THRE
 	.byte	$04,$12,$01,$17	; DRAW
 	.byte	$20,$0f,$0e,$05	;  ONE
 abiltxt
+
+invest2	rts
