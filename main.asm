@@ -259,10 +259,8 @@ getmove	jsr	$ffe4		;  do {
 	bcc	notfkey		;   } else if (a >= '1'
 	cmp	#'8'+1		;              &&
 	bcs	+		;              a < '9') {
-	pha			;
-	lda	#0		;
-	sta	TEMPVAR		;   TEMPVAR = 0;
-	pla			;
+	ldy	#0		;
+	sty	TEMPVAR		;   TEMPVAR = 0;
 	sec			;
 	sbc	#'1'		;    a -= '1'; // 0~7 even:crimescene,odd:office
 	lsr			;    // a:         0   1   2   3   4   5   6   7
@@ -283,7 +281,7 @@ getmove	jsr	$ffe4		;  do {
 
 notfkey	jmp	getmove		;   } else continue;
 
-trymove	pha			;
+trymove	pha			; FIXME: just use a variable MOVESEL XSto make pha/pla less convoluted
 	and	#$03		;
 	tay			;
 	lda	HAND,y		;
@@ -291,16 +289,16 @@ trymove	pha			;
 	beq	+		;   if (HAND[a & 3] >= 8)
 	pla			;
 	jmp	getmove		;    continue; // already played that card
-+
-	pla			;
++	pla			;
 	pha			;   uint8_t stack = a; // movedok() returns 1<<a
 	jsr	movedok		;   
 	bne	numleft		;   if (!movedok(a)) { //returns 1<<a if ok or 0
 	jsr	warning		;    if (warning() == 0 /* 0 wounds accepted */)
 	bne	acceptw		;
 	pla			;
-	beq	notfkey		;     continue;
+	jmp	notfkey		;     continue;
 acceptw	pla			;
+	pha			;
 	and	#$03		;
 	tay			;
 	lda	#NONCARD	;
@@ -308,7 +306,8 @@ acceptw	pla			;
 	dec	HANDREM		;    HANDREM--;
 	inc	NWOUNDS		;    NWOUNDS++;
 	digitxy	NWOUNDS,WDX,WDY	;    digitxy(NWOUNDS, WDX, WDY);
-numleft	lda	NWOUNDS		;   }
+numleft	pla			;
+	lda	NWOUNDS		;   }
 	cmp	#$03		;
 	bcc	+		;   if (NWOUNDS >= 3)
 	bcs	mainend		;    exit(0);
@@ -667,7 +666,7 @@ rejctok	sta	TEMPVAR		;uint8_t rejctok(register uint8_t& a) {
 	lda	TEMPVAR		;
 	and	#$f0		; else if (a & 0xf0 == 0) // got no threat cards
 	beq	rejrtn4		;  return 4;
-.if 1
+.if 0
 	lda	#0		; TEMPVAR = a;
 	clc			; // optimization (check flag bits before array)
 	rol	TEMPVAR		;
@@ -678,7 +677,7 @@ rejctok	sta	TEMPVAR		;uint8_t rejctok(register uint8_t& a) {
 +	cmp	#3		;
 	bcs	rejrtn3		; if (a < 3) { // might have 3 copies of a card
 .endif
-	lda	#1		;
+	lda	#3		;
 	ldy	#8		;
 -	ldx	HANDHST-1,y	;  for (register int8_t y = 7; y >= 0; y--)
 	cpx	#3		;   if (HANDHST[y] >= 3)
@@ -791,8 +790,12 @@ animrej	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
 	dex			;   HANDREM--;
 	bne	-		;  }
 	stx	HANDREM		; }
-+	plp			; return a == 'Y' || a == 'y', a = 1;
-	rts			;} // animrej()
++	lda	#1		;
+	plp			; return a == 'Y' || a == 'y';
+	beq	+		;
+	lda	#0		;
++	and	#$ff		;
+	rts			;} // animrejs()
 rejmsg0	.byte	$04,$09,$13,$03	; DISC
 	.byte	$01,$12,$04,$20	; ARD 
 	.byte	$26,$20,$12,$05	; & RE
