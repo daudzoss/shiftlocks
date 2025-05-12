@@ -365,8 +365,7 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	dec	TOFFICE		;                // will inc it back if invalid
 	bpl	++		;  if (--TOFFICE < 0) {// already played 2 cards
 	pha ; 0~3 to cs, 4~7 of.;
-	lda	#0		;
-	sta	TOFFICE		;   TOFFICE = 0;
+	inc	TOFFICE		;   TOFFICE++;
 	lda	TOSCENE		;
 	cmp	HANDREM		;
 	bne	+		;   if (TOSCENE == HANDREM) // and rest of hand:
@@ -378,75 +377,79 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	and	#$03		;
 	tay			;  register uint2_t y = a & 0x03; // hand slot
 	lda	HAND,y		;  a = HAND[y]; // card 0 ~ 7
-	pha ; card 0 ~ 7 played	;
+	pha
 	and	#$03		;
 	tax			;  register uint2_t x = a & 0x03; // office slot
-	pla ; card 0 ~ 7 played	;
+	pla			;
 	bit	threatm		;
-	beq	+		;  if (a & 0x04) { // only prompt if threat card
+	beq	++		;  if (a & 0x04) { // only prompt if threat card
 	tya			;
 	pha ; index in hand 0~3	;
-	jsr	oprompt		;   a = oprompt(); // threat to 1 ~ 4, 0 cancels
-	bne	+		;   if (a == 0)
+	jsr	oprompt		;
+	tax			;   x = oprompt(); // threat to 1 ~ 4, 0 cancels
+	bne	+		;   if (x == 0) {
 	pla			;
 	pla			;
-	pla			;
+	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;
 	jmp	notmove		;    return a = 0;
-+	
-
-
-	
++	lda	STACKHT+8,x	;   } // x no longer the card, but user's choice
+	bit	tisnext		;   if (STACKHT[8+x] & 1) {// but thr is showing
+	bne	++		;
+	pla			;
+	pla			;
+	inc	TOFFICE		;    TOFFICE++;
+	lda	#0		;    return a = 0;
+	jmp	notmove		;   }
 +	lda	STACKHT+8,x	;  } else { // trying to play investigation card
 	bit	tisnext		;   // which alternate so need stack height even
 	beq	+		;   if (STACKHT[8+x] & 1) {// but inv is showing
 	inc	TOFFICE		;    TOFFICE++;
-	lda	#0		;    return a = 0;
-	bne	+		;
+	lda	#0		;
 	pla			;
 	pla			;
-	jmp	notmove		;   }
-+	txa			;
-	asl			;
+	pla			;
+	jmp	notmove		;    return a = 0;
++	txa			;   }
+	asl			;  }
 	asl			;
 	asl			;
 	asl			;
 	clc			;    //stack#, position in stack
-	adc	STACKHT+8,x	;   a = x<<4 + STACKHT[8+x];
+	adc	STACKHT+8,x	;  a = x<<4 + STACKHT[8+x];
 	pha ;index into ODRAWER	;
-	inc	STACKHT+8,x	;   STACKHT[8+x]++; // increase before x clobber
+	inc	STACKHT+8,x	;  STACKHT[8+x]++; // increase before x clobber
 	txa			;
 	pha ;off. stack # 0 ~ 3	;
 	lda	STACKHT+8,x	;
-	pha ;stack level 1 ~ 16	;   a = x & 0x0f; // height of its office stack
+	pha ;stack level 1 ~ 16	;  a = x & 0x0f; // height of its office stack
 	jsr	fasthnd		;  
-	sta	TEMPVAR		;   TEMPVAR = fasthnd(y);// card taken from hand
+	sta	TEMPVAR		;  TEMPVAR = fasthnd(y);// card taken from hand
 	pla ;stack level 1 ~ 16	;
 	;adc	stacky+8	;
 	;sec			;
 	;sbc	#1		;
-	tay			;   y = stacky[8+a] /* == 1 */ + a /* - 1 */;
+	tay			;  y = stacky[8+a] /* == 1 */ + a /* - 1 */;
 	pla ;off. stack # 0 ~ 3	;
 	tax			;
 	lda	stackx+8,x	;
-	tax			;   x = stackx[8+a];
+	tax			;  x = stackx[8+a];
 	clc			;
 	lda	TEMPVAR		;
 	pha			;
-	jsr	cardsho		;   cardsho(0, TEMPVAR, x, y); // shown in office
+	jsr	cardsho		;  cardsho(0, TEMPVAR, x, y); // shown in office
 	pla			;
 	sta	TEMPVAR		;
 	pla ;index into ODRAWER	;
 	tax			;
 	lda	TEMPVAR		;
-	sta	ODRAWER,x	;   ODRAWER[a] = TEMPVAR;// and placed in drawer
+	sta	ODRAWER,x	;  ODRAWER[a] = TEMPVAR;// and placed in drawer
 	pla ; 0~3 to cs, 4~7 of.;
 	jmp	movepwr		; } else { // trying dec TOSCENE, always valid
 scenem	dec	TOSCENE		;
 	bpl	++		;  if (--TOSCENE < 0) {// already played 2 cards
-	pha			;
-	lda	#0		;
-	sta	TOSCENE		;   TOSCENE = 0;
+	pha ; 0~3 to cs, 4~7 of.;
+	inc	TOSCENE		;   TOSCENE++;
 	lda	TOFFICE		;
 	cmp	HANDREM		;
 	bne	+		;   if (TOFFICE == HANDREM) // and rest of hand:
@@ -454,11 +457,21 @@ scenem	dec	TOSCENE		;
 	lda	#0		;
 	jmp	notmove		;    return a = 0; // z set
 +	pla			;  }
-+	jsr	fromhnd		;  a = fromhnd(a);
-	tax			;  register uint2_t x = a; // scene slot
++	jsr	fromhnd		;
+	sta	TEMPVAR		;  TEMPVAR = fromhnd(a);
+	tax			;  register uint3_t x = a; // scene slot
+	pha ; scene slot 0 ~ 7	;
 	inc	STACKHT,x	;  STACKHT[x]++; // equivalent to placing a card
-	pha			;
-	lda	STACKHT,x	;//FIXME: need to show the card in stack first
+	lda	stacky,x	;
+	tay			;
+	lda	stackx,x	;
+	tax			;
+	clc			;
+	lda	TEMPVAR		;
+	jsr	cardsho		;  cardsho(0, TEMPVAR, stackx[x], stacky[x]);
+	pla			;
+	tax			;
+	lda	STACKHT,x	;
 	cmp	#2		;
 	beq	+		;
 	jmp	movepwr-1	;  if (STACKHT[x] == 2) {
