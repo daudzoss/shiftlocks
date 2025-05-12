@@ -364,33 +364,46 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	beq	scenem		; if (a & 0x04) { // trying dec TOFFICE first,
 	dec	TOFFICE		;                // will inc it back if invalid
 	bpl	++		;  if (--TOFFICE < 0) {// already played 2 cards
-	pha ; 0~7 even:cs,odd:o	;
+	pha ; 0~3 to cs, 4~7 of.;
 	lda	#0		;
 	sta	TOFFICE		;   TOFFICE = 0;
 	lda	TOSCENE		;
 	cmp	HANDREM		;
-	bne	+		;   if (TOSCENE == HANDREM) // and rest of hand
+	bne	+		;   if (TOSCENE == HANDREM) // and rest of hand:
 	pla			;// required to meet minimum of 2 played TOSCENE
 	lda	#0		;
 	jmp	notmove		;    return a = 0; // z set
 +	pla			;  } 
-+	and	#$03		;
++	pha ; 0~3 to cs, 4~7 of.;
+	and	#$03		;
 	tay			;  register uint2_t y = a & 0x03; // hand slot
 	lda	HAND,y		;  a = HAND[y]; // card 0 ~ 7
 	pha ; card 0 ~ 7 played	;
 	and	#$03		;
 	tax			;  register uint2_t x = a & 0x03; // office slot
-	pla			;
+	pla ; card 0 ~ 7 played	;
 	bit	threatm		;
 	beq	+		;  if (a & 0x04) { // only prompt if threat card
+	tya			;
+	pha ; index in hand 0~3	;
+	jsr	oprompt		;   a = oprompt(); // threat to 1 ~ 4, 0 cancels
+	bne	+		;   if (a == 0)
+	pla			;
+	pla			;
+	pla			;
+	lda	#0		;
+	jmp	notmove		;    return a = 0;
++	
 
-+	pha ; card 0 ~ 7 played	;  } else { // trying to play investigation card
-	lda	STACKHT+8,x	;
+
+	
++	lda	STACKHT+8,x	;  } else { // trying to play investigation card
 	bit	tisnext		;   // which alternate so need stack height even
 	beq	+		;   if (STACKHT[8+x] & 1) {// but inv is showing
 	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;    return a = 0;
 	bne	+		;
+	pla			;
 	pla			;
 	jmp	notmove		;   }
 +	txa			;
@@ -419,12 +432,15 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	tax			;   x = stackx[8+a];
 	clc			;
 	lda	TEMPVAR		;
+	pha			;
 	jsr	cardsho		;   cardsho(0, TEMPVAR, x, y); // shown in office
+	pla			;
+	sta	TEMPVAR		;
 	pla ;index into ODRAWER	;
 	tax			;
 	lda	TEMPVAR		;
 	sta	ODRAWER,x	;   ODRAWER[a] = TEMPVAR;// and placed in drawer
-	pla ; 0~7 even:cs,odd:o	;
+	pla ; 0~3 to cs, 4~7 of.;
 	jmp	movepwr		; } else { // trying dec TOSCENE, always valid
 scenem	dec	TOSCENE		;
 	bpl	++		;  if (--TOSCENE < 0) {// already played 2 cards
@@ -433,7 +449,7 @@ scenem	dec	TOSCENE		;
 	sta	TOSCENE		;   TOSCENE = 0;
 	lda	TOFFICE		;
 	cmp	HANDREM		;
-	bne	+		;   if (TOFFICE == HANDREM) // and rest of hand
+	bne	+		;   if (TOFFICE == HANDREM) // and rest of hand:
 	pla			;// required to meet minimum of 2 played TOFFICE
 	lda	#0		;
 	jmp	notmove		;    return a = 0; // z set
@@ -946,20 +962,20 @@ wrnmsg2
 
 
 				;//FIXME: move this over on the right by office
-	nop			;uint8_t oprompt(void) {
+	nop			;uint8_t oprompt(void) { do {register uint8_t a;
 oprompt	handmsg	offmsg0,offmsg1-offmsg0,offmsg2-offmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("TO WHICH PILE 1-4?"/*RVS ON*/
-	beq	-		;         "PRESS 0 TO CANCEL"/*RVS OFF*/, 18, 17,
-	and	#$df		;         SCRATCH);
-	cmp	#$59		; register uint8_t a = getchar();
-	php			; handmsg(SCRATCH, 17, 15); // pop backing store
+	beq	-		; "PRESS 0 TO CANCEL"/*RVS OFF*/,18,17,SCRATCH);
+	pha			; a = getchar();
 	handmsg	SCRATCH,offmsg1-offmsg0,offmsg2-offmsg1
-	lda	#0		;
-	plp			;
-	bne	+		;
-	lda	#1		; return (a=='Y' || a=='y');// # wounds accepted
-+	and	#$ff		;
-	rts			;} // warning()
+	pla			; handmsg(SCRATCH, 17, 15); // pop backing store
+	cmp	#'5'		;
+	bcs	oprompt		;
+	cmp	#'0'		;
+	bcc	oprompt		; } while (a < '0' || a > '4');
+	sec			;
+	sbc	#'0'		; return a - '0';
+	rts			;} // oprompt()
 offmsg0	.byte	$02,$0c,$01,$08	; BLAH
 	.byte	$02,$0c,$01,$08	; BLAH
 	.byte	$02,$0c,$01,$08	; BLAH
