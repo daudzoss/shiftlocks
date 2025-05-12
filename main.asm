@@ -361,7 +361,8 @@ threatm
 	.byte	$04		;// card 0~3 crimescene, 4~7 office
 tisnext	.byte	$01		;// height LSB 0 invest next, 1 threat next
 movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
-	beq	scenem		; if (a & 0x04) { // trying dec TOFFICE first,
+	bne	+		;
+	jmp	scenem		; if (a & 0x04) { // trying dec TOFFICE first,
 	dec	TOFFICE		;                // will inc it back if invalid
 	bpl	++		;  if (--TOFFICE < 0) {// already played 2 cards
 	pha ; 0~3 to cs, 4~7 of.;
@@ -444,7 +445,6 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	tax			;
 	lda	TEMPVAR		;
 	sta	ODRAWER,x	;  ODRAWER[a] = TEMPVAR;// and placed in drawer
-	pla ; 0~3 to cs, 4~7 of.;
 	jmp	movepwr		; } else { // trying dec TOSCENE, always valid
 scenem	dec	TOSCENE		;
 	bpl	++		;  if (--TOSCENE < 0) {// already played 2 cards
@@ -460,22 +460,30 @@ scenem	dec	TOSCENE		;
 +	jsr	fromhnd		;
 	sta	TEMPVAR		;  TEMPVAR = fromhnd(a);
 	tax			;  register uint3_t x = a; // scene slot
-	pha ; scene slot 0 ~ 7	;
 	inc	STACKHT,x	;  STACKHT[x]++; // equivalent to placing a card
 	lda	stacky,x	;
-	tay			;
+	pha ; y location of slot;
 	lda	stackx,x	;
-	tax			;
-	clc			;
-	lda	TEMPVAR		;
-	jsr	cardsho		;  cardsho(0, TEMPVAR, stackx[x], stacky[x]);
-	pla			;
-	tax			;
+	pha ; x location of slot;
 	lda	STACKHT,x	;
 	cmp	#2		;
-	beq	+		;
-	jmp	movepwr-1	;  if (STACKHT[x] == 2) {
-+	pla			;//FIXME: need to show the empty stack first
+	bge	+		;  if (STACKHT[x] < 2)
+	pla			;
+	tax			;
+	pla			;
+	tay			;
+	clc			;
+	lda	#NONCARD	;
+	jsr	cardsho		;   cardsho(0, NONCARD, stackx[x], stacky[x]);
+	jmp	movepwr		;  } else {
++	pla			;
+	tax			;
+	pla			;
+	tay			;
+	clc			;
+	lda	TEMPVAR		;
+	pha ; card from hand	;
+	jsr	cardsho		;   cardsho(0, TEMPVAR, stackx[x], stacky[x]);
 	ldy	DISCREM		;   // discard both cards that have accumulated
 	sta	DISCARD,y	;
 	iny			;   DISCARD[DISCREM++] = a;
@@ -483,17 +491,16 @@ scenem	dec	TOSCENE		;
 	sta	DISCARD,y	;
 	iny			;
 	sty	DISCREM		;   DISCARD[DISCREM++] = a;
-	bit	threatm		;//FIXME: need to show top card in discard first
+	jsr	discsho		;   discsho();   
+	pla			;   a = TEMPVAR;
+	bit	threatm		;
 	beq	+		;   if (a & 0x04) {// threat card, won't cascade
 	inc	NWOUNDS		;    NWOUNDS++;
-	pha			;
 	digitxy	NWOUNDS,WDX,WDY	;    digitxy(NWOUNDS, WDX, WDY);
-	pla			;
 	jmp	movepwr		;   } else {// FIXME: movedok() even re-entrant?
-+	pha			;
-	jsr	invest2		;    invest2(a); // defined in playeras.asm link
-	pla			;   }
-movepwr	tay			;  }
++	jsr	invest2		;    invest2(a); // defined in playeras.asm link
+movepwr	pla			;   }
+	tay			;  }
 	iny			; }
 	lda	#0		;
 	sec			;
@@ -983,10 +990,12 @@ oprompt	handmsg	offmsg0,offmsg1-offmsg0,offmsg2-offmsg1,SCRATCH
 	handmsg	SCRATCH,offmsg1-offmsg0,offmsg2-offmsg1
 	pla			; handmsg(SCRATCH, 17, 15); // pop backing store
 	cmp	#'5'		;
-	bcs	oprompt		;
-	cmp	#'0'		;
-	bcc	oprompt		; } while (a < '0' || a > '4');
-	sec			;
+	bcc	+		;
+	jmp	oprompt		;
++	cmp	#'0'		;
+	bcs	+		;
+	jmp	oprompt		; } while (a < '0' || a > '4');
++	sec			;
 	sbc	#'0'		; return a - '0';
 	rts			;} // oprompt()
 offmsg0	.byte	$02,$0c,$01,$08	; BLAH
