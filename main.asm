@@ -342,7 +342,7 @@ fasthnd	lda	HAND,y		; retval = HAND[a & 0x03]; //in here if y passed
 +	and	#$ff		; return retval; // returned 0 ~ 7 card, 8 empty
 	rts			;} // fromhnd()
 
-intohnd	and	#$07		;intohnd(register uint3_t a)  {
+intohnd	and	#$07		;uint8_t intohnd(register uint3_t a)  {
 	ldy	#4		; register int8_t x, y; // took card 0 ~ 7
 -	ldx	HAND-1,y	; for (y = 3; y >= 0; y--) {
 	cpx	#NONCARD	;  if (HAND[y] >= NONCARD) // empty slot found
@@ -365,40 +365,40 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	jmp	scenem		; if (a & 0x04) { // trying dec TOFFICE first,
 	dec	TOFFICE		;                // will inc it back if invalid
 	bpl	++		;  if (--TOFFICE < 0) {// already played 2 cards
-	pha ; 0~3 to cs, 4~7 of.;
+	pha;1:0~3 to cs, 4~7 of.;
 	inc	TOFFICE		;   TOFFICE++;
 	lda	TOSCENE		;
 	cmp	HANDREM		;
 	bne	+		;   if (TOSCENE == HANDREM) // and rest of hand:
-	pla			;// required to meet minimum of 2 played TOSCENE
+	pla;1->0		;// required to meet minimum of 2 played TOSCENE
 	lda	#0		;
 	jmp	notmove		;    return a = 0; // z set
-+	pla			;  } 
-+	pha ; 0~3 to cs, 4~7 of.;
++	pla;1->0		;  } 
++	pha;1:0~3 to cs, 4~7 of.;
 	and	#$03		;
 	tay			;  register uint2_t y = a & 0x03; // hand slot
 	lda	HAND,y		;  a = HAND[y]; // card 0 ~ 7
-	pha
+	pha;2:played card 0~7	;
 	and	#$03		;
 	tax			;  register uint2_t x = a & 0x03; // office slot
-	pla			;
+	pla;2->1		;
 	bit	threatm		;
 	beq	++		;  if (a & 0x04) { // only prompt if threat card
 	tya			;
-	pha ; index in hand 0~3	;
+	pha;2:index in hand 0~3	;
 	jsr	oprompt		;
 	tax			;   x = oprompt(); // threat to 1 ~ 4, 0 cancels
 	bne	+		;   if (x == 0) {
-	pla			;
-	pla			;
+	pla;2->1		;
+	pla;1->0		;
 	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;
 	jmp	notmove		;    return a = 0;
 +	lda	STACKHT+8,x	;   } // x no longer the card, but user's choice
 	bit	tisnext		;   if (STACKHT[8+x] & 1) {// but thr is showing
 	bne	++		;
-	pla			;
-	pla			;
+	pla;2->1		;
+	pla;1->0		;
 	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;    return a = 0;
 	jmp	notmove		;   }
@@ -407,9 +407,8 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	beq	+		;   if (STACKHT[8+x] & 1) {// but inv is showing
 	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;
-	pla			;
-	pla			;
-	pla			;
+	pla;2->1		;
+	pla;1->0		;
 	jmp	notmove		;    return a = 0;
 +	txa			;   }
 	asl			;  }
@@ -418,71 +417,69 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	asl			;
 	clc			;    //stack#, position in stack
 	adc	STACKHT+8,x	;  a = x<<4 + STACKHT[8+x];
-	pha ;index into ODRAWER	;
+	pha;3:index into ODRAWER;
 	inc	STACKHT+8,x	;  STACKHT[8+x]++; // increase before x clobber
 	txa			;
-	pha ;off. stack # 0 ~ 3	;
+	pha;4:off. stack # 0 ~ 3;
 	lda	STACKHT+8,x	;
-	pha ;stack level 1 ~ 16	;  a = x & 0x0f; // height of its office stack
+	pha;5:stack level 1 ~ 16;  a = x & 0x0f; // height of its office stack
 	jsr	fasthnd		;  
 	sta	TEMPVAR		;  TEMPVAR = fasthnd(y);// card taken from hand
-	pla ;stack level 1 ~ 16	;
+	pla;5->4		;
 	;adc	stacky+8	;
 	;sec			;
 	;sbc	#1		;
 	tay			;  y = stacky[8+a] /* == 1 */ + a /* - 1 */;
-	pla ;off. stack # 0 ~ 3	;
+	pla;4->3		;
 	tax			;
 	lda	stackx+8,x	;
 	tax			;  x = stackx[8+a];
+	lda	TEMPVAR		;
 	clc			;
-	lda	TEMPVAR		;
-	pha			;
 	jsr	cardsho		;  cardsho(0, TEMPVAR, x, y); // shown in office
-	pla			;
-	sta	TEMPVAR		;
-	pla ;index into ODRAWER	;
+	pla;3->2		;
 	tax			;
-	lda	TEMPVAR		;
+	pla;2->1		;
 	sta	ODRAWER,x	;  ODRAWER[a] = TEMPVAR;// and placed in drawer
 	jmp	movepwr		; } else { // trying dec TOSCENE, always valid
 scenem	dec	TOSCENE		;
 	bpl	++		;  if (--TOSCENE < 0) {// already played 2 cards
-	pha ; 0~3 to cs, 4~7 of.;
+	pha;1:0~3 to cs, 4~7 of.;
 	inc	TOSCENE		;   TOSCENE++;
 	lda	TOFFICE		;
 	cmp	HANDREM		;
 	bne	+		;   if (TOFFICE == HANDREM) // and rest of hand:
-	pla			;// required to meet minimum of 2 played TOFFICE
+	pla;1->0		;// required to meet minimum of 2 played TOFFICE
 	lda	#0		;
 	jmp	notmove		;    return a = 0; // z set
-+	pla			;  }
++	pla;1->0		;  }
++	pha;1:0~3 to cs, 4~7 of.;
 +	jsr	fromhnd		;
 	sta	TEMPVAR		;  TEMPVAR = fromhnd(a);
 	tax			;  register uint3_t x = a; // scene slot
 	inc	STACKHT,x	;  STACKHT[x]++; // equivalent to placing a card
 	lda	stacky,x	;
-	pha ; y location of slot;
+	pha;2:y location of slot;
 	lda	stackx,x	;
-	pha ; x location of slot;
+	pha;3:x location of slot;
 	lda	STACKHT,x	;
 	cmp	#2		;
 	bge	+		;  if (STACKHT[x] < 2)
-	pla			;
+	pla;3->2		;
 	tax			;
-	pla			;
+	pla;2->1		;
 	tay			;
 	clc			;
 	lda	#NONCARD	;
 	jsr	cardsho		;   cardsho(0, NONCARD, stackx[x], stacky[x]);
 	jmp	movepwr		;  } else {
-+	pla			;
++	pla;3->2		;
 	tax			;
-	pla			;
+	pla;2->1		;
 	tay			;
 	clc			;
 	lda	TEMPVAR		;
-	pha ; card from hand	;
+	pha;2: card from hand	;
 	jsr	cardsho		;   cardsho(0, TEMPVAR, stackx[x], stacky[x]);
 	ldy	DISCREM		;   // discard both cards that have accumulated
 	sta	DISCARD,y	;
@@ -492,14 +489,14 @@ scenem	dec	TOSCENE		;
 	iny			;
 	sty	DISCREM		;   DISCARD[DISCREM++] = a;
 	jsr	discsho		;   discsho();   
-	pla			;   a = TEMPVAR;
+	pla;2->1		;   a = TEMPVAR;
 	bit	threatm		;
 	beq	+		;   if (a & 0x04) {// threat card, won't cascade
 	inc	NWOUNDS		;    NWOUNDS++;
 	digitxy	NWOUNDS,WDX,WDY	;    digitxy(NWOUNDS, WDX, WDY);
 	jmp	movepwr		;   } else {// FIXME: movedok() even re-entrant?
 +	jsr	invest2		;    invest2(a); // defined in playeras.asm link
-movepwr	pla			;   }
+movepwr	pla;1->0		;   }
 	tay			;  }
 	iny			; }
 	lda	#0		;
