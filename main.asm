@@ -211,7 +211,7 @@ stackx	.byte	$00,$04,$08,$0c
 	.byte	$00,$04,$08,$0c	
 	.byte	$16,$1b,$20,$25
 stacky	.byte	9,9,9,9,1,1,1,1
-	.byte	1,1,1,1		;bottom card of a stack allowed to grow up to...
+	.byte	1;,1,1,1	;bottom card of a stack allowed to grow up to...
 stacklm	.byte	1,1,1,1,1,1,1,1
 	.byte	$10,$10,$10,$10	;16 (alternating invest with threat or removals)
 isoffic	.byte	$04		;for nondestructive bit tests
@@ -364,7 +364,7 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	beq	scenem		; if (a & 0x04) { // trying dec TOFFICE first,
 	dec	TOFFICE		;                // will inc it back if invalid
 	bpl	++		;  if (--TOFFICE < 0) {// already played 2 cards
-	pha			;
+	pha ; 0~7 even:cs,odd:o	;
 	lda	#0		;
 	sta	TOFFICE		;   TOFFICE = 0;
 	lda	TOSCENE		;
@@ -377,39 +377,54 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 +	and	#$03		;
 	tay			;  register uint2_t y = a & 0x03; // hand slot
 	lda	HAND,y		;  a = HAND[y]; // card 0 ~ 7
-	pha			;
+	pha ; card 0 ~ 7 played	;
 	and	#$03		;
 	tax			;  register uint2_t x = a & 0x03; // office slot
 	pla			;
 	bit	threatm		;
 	beq	+		;  if (a & 0x04) { // only prompt if threat card
-	
 
-
-+	lda	STACKHT+8,x	;  } else { // trying to play investigation card
++	pha ; card 0 ~ 7 played	;  } else { // trying to play investigation card
+	lda	STACKHT+8,x	;
 	bit	tisnext		;   // which alternate so need stack height even
 	beq	+		;   if (STACKHT[8+x] & 1) {// but inv is showing
 	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;    return a = 0;
 	bne	+		;
+	pla			;
 	jmp	notmove		;   }
-+	pha			;
-	txa			;
++	txa			;
 	asl			;
 	asl			;
 	asl			;
 	asl			;
 	clc			;    //stack#, position in stack
 	adc	STACKHT+8,x	;   a = x<<4 + STACKHT[8+x];
+	pha ;index into ODRAWER	;
 	inc	STACKHT+8,x	;   STACKHT[8+x]++; // increase before x clobber
-	pha			;
+	txa			;
+	pha ;off. stack # 0 ~ 3	;
+	lda	STACKHT+8,x	;
+	pha ;stack level 1 ~ 16	;   a = x & 0x0f; // height of its office stack
 	jsr	fasthnd		;  
 	sta	TEMPVAR		;   TEMPVAR = fasthnd(y);// card taken from hand
-	pla			;
+	pla ;stack level 1 ~ 16	;
+	;adc	stacky+8	;
+	;sec			;
+	;sbc	#1		;
+	tay			;   y = stacky[8+a] /* == 1 */ + a /* - 1 */;
+	pla ;off. stack # 0 ~ 3	;
+	tax			;
+	lda	stackx+8,x	;
+	tax			;   x = stackx[8+a];
+	clc			;
+	lda	TEMPVAR		;
+	jsr	cardsho		;   cardsho(0, TEMPVAR, x, y); // shown in office
+	pla ;index into ODRAWER	;
 	tax			;
 	lda	TEMPVAR		;
 	sta	ODRAWER,x	;   ODRAWER[a] = TEMPVAR;// and placed in drawer
-	pla			;//FIXME: need to show the card in stack first
+	pla ; 0~7 even:cs,odd:o	;
 	jmp	movepwr		; } else { // trying dec TOSCENE, always valid
 scenem	dec	TOSCENE		;
 	bpl	++		;  if (--TOSCENE < 0) {// already played 2 cards
