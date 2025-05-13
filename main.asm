@@ -951,7 +951,7 @@ rejmsg1	.byte	$a0,$90,$92,$85	;  PRE
 	.byte	$a0		;
 rejmsg2	
 
-	nop			;uint8_t warning(void) {
+				;uint8_t warning(void) {
 warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("CANNOT PLAY THERE"/*RVS ON*/
 	beq	-		;         "PRESS Y FOR WOUND"/*RVS OFF*/, 17, 17,
@@ -978,13 +978,19 @@ wrnmsg1	.byte   $90,$92,$85,$93 ; PRES
 wrnmsg2
 
 
-				;//FIXME: move this over on the right by office
-	nop			;uint8_t oprompt(void) { do {register uint8_t a;
-oprompt	handmsg	offmsg0,offmsg1-offmsg0,offmsg2-offmsg1,SCRATCH
+oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
+	ldx	#$15		;uint8_t oprompt(void) { do {register uint8_t a;
+	ldy	#$00		;
+	lda	#offmsg1-offmsg0;
+	txtclip	SCRATCH		;
+	lda	#offmsg1-offmsg0;
+	replace	offmsg0		;
 -	jsr	$ffe4		; handmsg("TO WHICH PILE 1-4?"/*RVS ON*/
 	beq	-		; "PRESS 0 TO CANCEL"/*RVS OFF*/,18,17,SCRATCH);
 	pha			; a = getchar();
-	handmsg	SCRATCH,offmsg1-offmsg0,offmsg2-offmsg1
+	lda	#offmsg1-offmsg0;
+	replace	SCRATCH		;
+	handmsg	SCRATCH+offmsg1-offmsg0,offmsg2-offmsg1,0
 	pla			; handmsg(SCRATCH, 17, 15); // pop backing store
 	cmp	#'5'		;
 	bcc	+		;
@@ -995,15 +1001,16 @@ oprompt	handmsg	offmsg0,offmsg1-offmsg0,offmsg2-offmsg1,SCRATCH
 +	sec			;
 	sbc	#'0'		; return a - '0';
 	rts			;} // oprompt()
-offmsg0	.byte	$02,$0c,$01,$08	; BLAH
-	.byte	$02,$0c,$01,$08	; BLAH
-	.byte	$02,$0c,$01,$08	; BLAH
-	.byte	$02,$0c,$01,$08	; BLAH
+offmsg0	.byte	$0f,$0e,$20,$14	; ON T
+	.byte	$0f,$10,$20,$0f	; OP O
+	.byte	$06,$20,$10,$09	; F PI
+	.byte	$0c,$05,$20,$31	; LE 1
+	.byte	$2d,$34,$3f	; -4?
 offmsg1	.byte   $90,$92,$85,$93 ; PRES
 	.byte   $93,$a0,$b0,$a0 ; S 0 
-	.byte   $86,$8f,$92,$a0 ; FOR
-	.byte	$97,$8f,$95,$8e	; WOUN
-	.byte	$84		; D
+	.byte   $94,$8f,$a0,$83 ; TO C
+	.byte	$81,$8e,$83,$85	; ANCE
+	.byte	$8c		; L
 offmsg2
 
 	.byte	$00,$00,(+)-*-3	; (0,0)
