@@ -4,7 +4,7 @@
 *	= BASIC+1
 .else
 *	= $0002+1
-COPIED2	= $8000
+COPIED2	= $0400
 	.word	(+), 3
 	.text	$81,$41,$b2,$30	; FOR A = 0
 	.text	$a4		; TO prefld-start
@@ -228,17 +228,18 @@ main	lda	#0		;void main (void) {
 
 	nop			; do {
 newhand	jsr	drw4hnd		;  do {
-	sta	HANDFOM		;   HANDFOM = drw4hand(); // nonzero if we drew 4
+	sta	HANDFOM		;   HANDFOM = drw4hand();// nonzero if we drew 4
 	bne	+		;   if (HANDFOM == 0)
 	brk			;    exit(1); // more than 44 cards in stacks?!?
 	.byte	$1		;
 +	jsr	snapsht		;   snapshot();
-	jsr	animhnd		;   animhnd(); // draw empty deck pile after if 0
+	jsr	animhnd		;   animhnd();// draw empty deck pile after if 0
+	jsr	discsho		;   discsho();// ,empty discard pile if shuffled
 	lda	HANDFOM		;
 	jsr	rejctok		;
       	beq	+		;
 	jsr	animrej		;
-	beq	newhand		;  } while (rejctok(HANDFOM) && animrej());
+	bne	newhand		;  } while (rejctok(HANDFOM) && animrej());
 
 +	lda	#2		;  // we have a hand that was acceptable
 	sta	TOSCENE		;  TOSCENE = TOFFICE = 2;//#cards not yet in each
@@ -894,57 +895,41 @@ cardout	clc			;void cardout(register uint8_t& x,
 	bne	-		; }
 	rts			;} // cardout()
 
-	nop			;uint1_t animrej(void) {
+				;uint1_t animrej(void) {
 animrej	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("DISCARD & REDRAW?"/*RVS ON*/
 	beq	-		;         " PRESS Y FOR YES "/*RVS OFF*/, 17, 17,
 	and	#$df		;         SCRATCH);
 	cmp	#$59		; register uint8_t a = getchar();
-	php			; handmsg(SCRATCH, 17, 17); // pop backing store
+	php;1:z==getchar()=='y'	; handmsg(SCRATCH, 17, 17); // pop backing store
 	handmsg	SCRATCH,rejmsg1-rejmsg0,rejmsg2-rejmsg1
-	plp			;
-	php			;
-	bne	+		; if (a == 'Y' || a == 'y') {
-	ldx	HANDREM		;
-.if 1
- cpx #4	
- beq +
- brk
- .byte 4	
-+
-.endif
-	ldy	DISCREM		;
--	lda	HAND-1,x	;  for (register int8_t x = 3; x >= 0; x--) {
-	sta	DISCARD,y	;
-	iny			;
-	sty	DISCREM		;   DISCARD[DISCREM++] = HAND[x];
-	lda	#NONCARD	;
-	sta	HAND-1,x	;   HAND[x] = 0x09; // blank a 3x5 rectangle...
-	txa			;
-	pha			;
-	tya			;
-	pha			;
+	plp;1->0		;
+	bne	rejectn		; if (a == 'Y' || a == 'y') {
+	ldx	DISCREM		;  register uint8_t x = DISCREM;
+	ldy	HANDREM		;
 .if 0
-	lda	inhandx-1,x	;
-	tax			;
-	lda	#NONCARD	;
-	ldy	inhandy		;
-	clc			;   // at that card's location:
-	jsr	cardsho		;   cardsho(0, 0x09, inhandx[x], inhandy[x]);
+	cpy	#4		;
+	beq	+		;  if (HANDREM != 4)
+-	brk			;   exit(4);
++	nop			;
 .endif
-	jsr	discsho		;   discsho(); // and show the card in the pile
-	pla			;
-	tay			;
-	pla			;
-	tax			;
-	dex			;   HANDREM--;
+-	dey			;  for (register int8_t y=HANDREM-1; y>=0; y--){
+	bmi	+		;
+	jsr	fasthnd		;   a = fasthnd(y);
+.if 0
+	cmp	#NONCARD	;   if (a >= NONCARD)
+	bcs	--		;    exit(4);
+.endif
+	sta	DISCARD,x	;
+	inx			;   DISCARD[x++] = a;
 	bne	-		;  }
-	stx	HANDREM		; }
-+	lda	#1		;
-	plp			; return a == 'Y' || a == 'y';
-	beq	+		;
-	lda	#0		;
-+	and	#$ff		;
++
+	stx	DISCREM		;  DISCREM = x;
+	jsr	discsho		;  discsho();
+	
+rejecty	lda	#1		;  return 1;
+	rts			; } else
+rejectn	lda	#0		;  return 0;
 	rts			;} // animrejs()
 rejmsg0	.byte	$04,$09,$13,$03	; DISC
 	.byte	$01,$12,$04,$20	; ARD 
