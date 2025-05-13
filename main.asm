@@ -211,10 +211,9 @@ stackx	.byte	$00,$04,$08,$0c
 	.byte	$00,$04,$08,$0c	
 	.byte	$16,$1b,$20,$25
 stacky	.byte	9,9,9,9,1,1,1,1
-	.byte	1;,1,1,1	;bottom card of a stack allowed to grow up to...
-stacklm	.byte	1,1,1,1,1,1,1,1
-	.byte	$10,$10,$10,$10	;16 (alternating invest with threat or removals)
-isoffic	.byte	$04		;for nondestructive bit tests
+	.byte	1,1,1,1		;
+;stacklm	.byte	1,1,1,1,1,1,1,1	;bottom card of a stack allowed to grow up to...
+;	.byte	$10,$10,$10,$10	;16 (alternating invest with threat or removals)
 
 main	lda	#0		;void main (void) {
 	sta	DISCREM		;
@@ -381,15 +380,16 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	tax			;  register uint2_t x = a & 0x03; // office slot
 	lda	TEMPVAR		;
 	bit	threatm		;
-	beq	++		;  if (TEMPVAR & 0x04) { // threat card
+	beq	+++		;  if (TEMPVAR & 0x04) { // threat card
 	jsr	oprompt		;   // unlike investigation card, prompt for pile
 	tax			;   x = oprompt(); // threat to 1 ~ 4, 0 cancels
 	bne	+		;   if (x == 0) {
 	pla;2->1		;
 	pla;1->0		;
 	inc	TOFFICE		;    TOFFICE++;
-	lda	#0		;
-	jmp	notmove		;    return a = 0;
+	lda	#0		;    return a = 0;
+	jmp	notmove		;   } else
++	dex			;    x--; // convert from pile 1~4 to offset 0~3
 +	lda	STACKHT+8,x	;   } // x no longer the card, but user's choice
 	bit	tisnext		;
 	bne	++		;   if (STACKHT[8+x]&1 == 0) {// but thr showing
@@ -821,13 +821,12 @@ rejctok	sta	TEMPVAR		;uint8_t rejctok(register uint8_t& a) {
 	bcs	rejrtn3		; if (a < 3) { // might have 3 copies of a card
 .endif
 	lda	#3		;
-	ldy	#8		;
--	ldx	HANDHST-1,y	;  for (register int8_t y = 7; y >= 0; y--)
-	cpx	#3		;   if (HANDHST[y] >= 3)
-	bcs	rejrtn3		;    return 3; // indeed have 3 copies of card y
+	ldy	#8		;  for (register int8_t y = 7; y >= 0; y--)
+-	cmp	HANDHST-1,y	;   if (HANDHST[y] >= 3)
+	beq	rejrtn3		;    return 3; // indeed have 3 copies of card y
 	dey			;
 	bne	-		; }
-rerrtn0	lda	#$fc		; return 0;
+rejrtn0	lda	#$fc		; return 0;
 rejrtn4	clc			;
 	adc	#4		;
 rejrtn3	rts			;} // rejctok()
@@ -905,7 +904,14 @@ animrej	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
 	plp			;
 	php			;
 	bne	+		; if (a == 'Y' || a == 'y') {
-	ldx	#4		;
+	ldx	HANDREM		;
+.if 1
+ cpx #4	
+ beq +
+ brk
+ .byte 4	
++
+.endif
 	ldy	DISCREM		;
 -	lda	HAND-1,x	;  for (register int8_t x = 3; x >= 0; x--) {
 	sta	DISCARD,y	;
