@@ -388,7 +388,7 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	pla;1->0		;
 	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;    return a = 0;
-	jmp	notmove		;   } else
+	jmp	notmove		;   } else {
 +	dex			;    x--; // convert from pile 1~4 to offset 0~3
 +	lda	STACKHT+8,x	;   } // x no longer the card, but user's choice
 	bit	tisnext		;
@@ -397,7 +397,7 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	pla;1->0		;
 	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;    return a = 0;
-	jmp	notmove		;   }
+	jmp	notmove		;   } // FIXME:check this 4~7 not already present
 +	lda	STACKHT+8,x	;  } else { // trying to play investigation card
 	bit	tisnext		;   // which alternate so need stack height even
 	beq	+		;   if (STACKHT[8+x] & 1) {// but inv is showing
@@ -452,6 +452,7 @@ scenem	dec	TOSCENE		;
 	lda	#0		;// required to meet minimum of 2 played TOFFICE
 	jmp	notmove		;    return a = 0; // z set
 +	pha;1:0~3 to cs, 4~7 of.;  }
+	;and	#$03		;
 	jsr	fromhnd		;
 	sta	TEMPVAR		;  TEMPVAR = fromhnd(a);// card taken from hand,
 	tax			;  register uint3_t x = TEMPVAR;//shown in scene
@@ -462,23 +463,23 @@ scenem	dec	TOSCENE		;
 	pha;3:x location of slot;
 	lda	STACKHT,x	;
 	cmp	#2		;
-	bcs	+		;  if (STACKHT[x] < 2)
+	bcs	+		;  if (STACKHT[x] < 2) // initial harmless but..
 	pla;3->2		;
 	tax			;
 	pla;2->1		;
 	tay			;
 	clc			;
-	lda	#NONCARD	;
-	jsr	cardsho		;   cardsho(0, NONCARD, stackx[x], stacky[x]);
-	jmp	movepwr		;  } else {
+	lda	TEMPVAR		;
+	jsr	cardsho		;   cardsho(0, TEMPVAR, stackx[x], stacky[x]);
+	jmp	movepwr		;  } else { // wounded from adding a second card
 +	pla;3->2		;
 	tax			;
 	pla;2->1		;
 	tay			;
 	clc			;
-	lda	TEMPVAR		;
+	lda	#NONCARD	;
 	pha;2: card from hand	;
-	jsr	cardsho		;   cardsho(0, TEMPVAR, stackx[x], stacky[x]);
+	jsr	cardsho		;   cardsho(0, NONCARD, stackx[x], stacky[x]);
 	pla;2->1		;
 	pha;2: card from hand	;
 	ldy	DISCREM		;   // discard both cards that have accumulated
