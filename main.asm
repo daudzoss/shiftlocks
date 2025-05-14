@@ -255,7 +255,7 @@ getmove	jsr	$ffe4		;  do {
 	jmp	getmove		;    continue;
 
 +	cmp	#INS_KEY	;
-	bne	+		;   } else if (a == INS_KEY) {
+	bne	nummove		;   } else if (a == INS_KEY) {
 	jsr	redomov		;    redomov();   
 	jmp	getmove		;    continue;
 
@@ -294,28 +294,44 @@ notfkey	cmp	#$5f		; // <-
 	jmp	getmove		;
 
 +	cmp	#$1d		; // R
+	bne	+++		;
+	lda	ACURSOR		;
 	bne	+		;
-	lda	#$02
-	jsr	arrowky		;
-	jmp	trymove		;
+	lda	#8		;
+	bne	++		;
++	lda	#$02		;
++	jsr	arrowky		;
+	jmp	getmove		;
 	
 +	cmp	#$11		; // D
+	bne	+++		;
+	lda	ACURSOR		;
 	bne	+		;
-	lda	#$01		;
-	jsr	arrowky		;
-	jmp	trymove		;
+	lda	#4		;
+	bne	++		;
++	lda	#$01		;
++	jsr	arrowky		;
+	jmp	getmove		;
 
 +	cmp	#$9d		; // L
+	bne	+++		;
+	lda	ACURSOR		;
 	bne	+		;
-	lda	#$ff		;
-	jsr	arrowky		;
-	jmp	trymove		;
+	lda	#1		;
+	bne	++		;
++	lda	#$fe		;
++	jsr	arrowky		;
+	jmp	getmove		;
 
 +	cmp	#$91		; // U
+	bne	+++		;
+	lda	ACURSOR		;
 	bne	+		;
-	lda	#$fe		;
-	jsr	arrowky		;
-	jmp	trymove		;
+	lda	#5		;
+	bne	++		;
++	lda	#$ff		;
++	jsr	arrowky		;
+	jmp	getmove		;
 	
 +	cmp	#$0d		; // Return
 	bne	notakey		;
@@ -369,7 +385,7 @@ wndleft	digitxy	NWOUNDS,WDX,WDY	;   }
 mainend	rts			;} // main()
 
 ARROWOD	= SCREENM+SCREENW*$0f+1-2
-ARROWEV	= ARROWOD+6*SCREENW+2-8
+ARROWEV	= ARROWOD+6*SCREENW
 evenodd	.byte	$02		;
 arrowky	cmp	#0		;void arrowky(register int8_t& a) { // -2,...,+2
 	bne	cursor1		; if (a == 0) { // a request to de-highlight
