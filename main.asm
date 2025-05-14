@@ -216,7 +216,12 @@ stacky	.byte	9,9,9,9,1,1,1,1
 ;stacklm	.byte	1,1,1,1,1,1,1,1	;bottom card of a stack allowed to grow up to...
 ;	.byte	$10,$10,$10,$10	;16 (alternating invest with threat or removals)
 
-main	lda	#0		;void main (void) {
+main
+.if !BASIC
+	lda	#$0f		;// P500 has to start in bank 15
+	sta	$01		;static volatile int execute_bank = 15;
+.endif
+	lda	#0		;void main (void) {
 	sta	ACURSOR		; ACURSOR = 0; // visible from arrow to Esc key
 	sta	DISCREM		;
 	sta	HANDREM		;
