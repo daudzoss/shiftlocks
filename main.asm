@@ -255,15 +255,15 @@ getmove	jsr	$ffe4		;  do {
 	jmp	getmove		;    continue;
 
 +	cmp	#INS_KEY	;
-	bne	nummove		;   } else if (a == INS_KEY) {
+	bne	+		;   } else if (a == INS_KEY) {
 	jsr	redomov		;    redomov();   
 	jmp	getmove		;    continue;
 
-nummove	cmp	#'1'		;
++	cmp	#'1'		;
 	bcc	notfkey		;   } else if (a >= '1'
 	cmp	#'8'+1		;              &&
 	bcs	+		;              a < '9') {
-	ldy	#0		;
+nummove	ldy	#0		;   nummove:
 	sty	TEMPVAR		;    TEMPVAR = 0;
 	sec			;
 	sbc	#'1'		;    a -= '1'; // 0~7 even:crimescene,odd:office
@@ -336,6 +336,10 @@ notfkey	cmp	#$5f		; // <-
 +	cmp	#$0d		; // Return
 	bne	notakey		;
 	lda	ACURSOR		;
+	bne	+		;
+	jmp	getmove		;
++	clc			;
+	adc	#'0'		;
 	jmp	nummove		;
 
 notakey	jmp	getmove		;   } else /* handle other keys here, or */ continue;
