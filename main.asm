@@ -146,8 +146,9 @@ UNSAVED	= vararea + $100
 .error "saved variables crashed into ceiling, obliterated UNSAVED"
 .endif
 HANDHST	= UNSAVED + $0
-TEMPVAR	= UNSAVED + $8
-SCRATCH	= UNSAVED + $9		; must be last
+ACURSOR	= UNSAVED + $08
+TEMPVAR	= UNSAVED + $09
+SCRATCH	= UNSAVED + $0a		; must be last
 
 snapsht	rts
 
@@ -216,6 +217,7 @@ stacky	.byte	9,9,9,9,1,1,1,1
 ;	.byte	$10,$10,$10,$10	;16 (alternating invest with threat or removals)
 
 main	lda	#0		;void main (void) {
+	sta	ACURSOR		; ACURSOR = 0; // visible from arrow to Esc key
 	sta	DISCREM		;
 	sta	HANDREM		;
 	sta	NWOUNDS		; NWOUNDS = DISCREM = HANDREM = 0;
@@ -226,7 +228,7 @@ main	lda	#0		;void main (void) {
 	jsr	initstk		; initstk(); // empty the crime scene and office
 	jsr	animshf		; animshf(); // shuffle deck briefly onscreen
 
-	nop			; do {
+				; do {
 newhand	jsr	drw4hnd		;  do {
 	sta	HANDFOM		;   HANDFOM = drw4hand();// nonzero if we drew 4
 	bne	+		;   if (HANDFOM == 0)
@@ -257,7 +259,7 @@ getmove	jsr	$ffe4		;  do {
 	jsr	redomov		;    redomov();   
 	jmp	getmove		;    continue;
 
-+	cmp	#'1'		;
+nummove	cmp	#'1'		;
 	bcc	notfkey		;   } else if (a >= '1'
 	cmp	#'8'+1		;              &&
 	bcs	+		;              a < '9') {
@@ -283,7 +285,44 @@ getmove	jsr	$ffe4		;  do {
 	sta	MOVESEL		;    MOVESEL = a;
 	jmp	trymove		;
 
-notfkey	jmp	getmove		;   } else /* handle other keys here, or */ continue;
+notfkey	cmp	#$5f		; // <-
+	beq	+		;
+	cmp	#$1b		; // Esc
+	bne	++		;
++	lda	#0		;
+	jsr	arrowky		;
+	jmp	getmove		;
+
++	cmp	#$1d		; // R
+	bne	+		;
+	lda	#$02
+	jsr	arrowky		;
+	jmp	trymove		;
+	
++	cmp	#$11		; // D
+	bne	+		;
+	lda	#$01		;
+	jsr	arrowky		;
+	jmp	trymove		;
+
++	cmp	#$9d		; // L
+	bne	+		;
+	lda	#$ff		;
+	jsr	arrowky		;
+	jmp	trymove		;
+
++	cmp	#$91		; // U
+	bne	+		;
+	lda	#$fe		;
+	jsr	arrowky		;
+	jmp	trymove		;
+	
++	cmp	#$0d		; // Return
+	bne	notakey		;
+	lda	ACURSOR		;
+	jmp	nummove		;
+
+notakey	jmp	getmove		;   } else /* handle other keys here, or */ continue;
 
 trymove	and	#$03		;
 	tay			;
@@ -293,7 +332,7 @@ trymove	and	#$03		;
 	jmp	getmove		;    continue; // already played that card
 +	lda	MOVESEL		;
 	jsr	movedok		;   // movedok() returns 1<<MOVESEL if ok else 0
-	bne	numleft		;   if (!movedok(MOVESEL)) {
+	bne	wndleft		;   if (!movedok(MOVESEL)) {
 	jsr	warning		;    if (warning() == 0 /* 0 wounds accepted */)
 	bne	acceptw		;
 	jmp	notfkey		;     continue;
@@ -303,7 +342,7 @@ acceptw	lda	MOVESEL		;
 	sta	DISCARD,y	;    DISCARD[DISCREM] = fromhnd(MOVESEL);
 	inc	DISCREM		;    DISCREM++;
 	inc	NWOUNDS		;    NWOUNDS++;
-numleft	digitxy	NWOUNDS,WDX,WDY	;   }
+wndleft	digitxy	NWOUNDS,WDX,WDY	;   }
 	lda	NWOUNDS		;   digitxy(NWOUNDS, WDX, WDY);
 	cmp	#$03		;
 	bcc	+		;   if (NWOUNDS >= 3)
@@ -329,6 +368,61 @@ numleft	digitxy	NWOUNDS,WDX,WDY	;   }
 	jmp	newhand		; } while (!gamewon());
 mainend	rts			;} // main()
 
+ARROWOD	= SCREENM+SCREENW*$0f+1-2
+ARROWEV	= ARROWOD+6*SCREENW+2-8
+evenodd	.byte	$02		;
+arrowky	cmp	#0		;void arrowky(register int8_t& a) { // -2,...,+2
+	bne	cursor1		; if (a == 0) { // a request to de-highlight
+	lda	ACURSOR		;
+	asl			;
+	tax			;  register uint8_t x = ACURSOR << 1;// turn off
+	lda	#0		;
+	sta	ACURSOR		;  ACURSOR = 0;
+	cpx	#0		;  if (x) // arrow mode not already cancelled
+	bne	cursor0		;   cursor0(x);
+	rts			; } else {
+cursor1	sta	TEMPVAR		;
+	lda	ACURSOR		;
+	asl			;
+	pha			;  uint8_t stack = ACURSOR << 1; // turn off
+	lsr			;
+	clc			;
+	adc	TEMPVAR		;
+	;bmi	+		;
+	beq	+		;  if ((ACURSOR + a) <= 0
+	cmp	#9		;      ||
+	bcc	++		;      (ACURSOR + a) > 8)
++	pla			;   return;
+	rts			;  else {
++	sta	ACURSOR		;   ACURSOR += a;
+	asl			;
+	tax			;   register uint8_t x = ACURSOR << 1;// turn on
+	bit	evenodd		;
+	beq	+		;   if (x & 2) // ACURSOR odd (cursor above hand)
+	lda	ARROWOD,x	;
+	ora	#$80		;
+	sta	ARROWOD,x	;    ARROWOD[x] |= 0x80;
+	pla			;    cursor0(stack);
+	tax			;   } else {
+	jmp	cursor0		;    ARROWEV[x] |= 0x80;
++	lda	ARROWEV,x	;    cursor0(stack);
+	ora	#$80		;   }
+	sta	ARROWEV,x	;  }
+	pla			; }
+	tax			;} // arrowky()
+cursor0	txa			;void cursor1(register uint8_t x) {
+	bit	evenodd		;
+	beq	+		; if (x & 2) // cursor above hand
+	lda	ARROWOD,x	;
+	and	#$7f		;
+	sta	ARROWOD,x	;  ARROWOD[x] &= 0x7f;
+	rts			; else
++	lda	ARROWEV,x	;
+	and	#$7f		;
+	sta	ARROWEV,x	;  ARROWEV[x] &= 0x7f;
+	rts			;}
+	
+	
 fromhnd	and	#$03		;uint8_t fromhnd(register uint2_t a) {
 	tay			; uint8_t retval; // took HAND index 0 ~ 3
 fasthnd	lda	HAND,y		; retval = HAND[a & 0x03]; //in here if y passed
