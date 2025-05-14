@@ -477,8 +477,36 @@ intohnd	and	#$07		;uint8_t intohnd(register uint3_t a)  {
 	tya			; return y; // returned HAND index 0 ~ 3
 +	rts			;} // intohnd()
 
-unambig	lda	#0		;uint3_t unambiguous(void) { // FIXME
-	rts			;return 0;}
+unambig	lda	#0		;uint3_t unambig(void) {
+	ldx	#1		; register uint8_t a = 0;
+-	clc			; for (register int8_t x = 1; x < 5; x++) {
+	ror	STACKHT+7,x	;
+	php			;
+	rol	STACKHT+7,x	;
+	plp			;
+	ror			;  a = ((STACKHT[8+x-1] & 1) << 7) | (a >> 1);
+	inx			;
+	cpx	#5		; }
+	bne	-		;
+	lsr			;
+	lsr			;
+	lsr			;
+	lsr			; switch (a >> 4) {
+	cmp	#1		; case 1:
+	beq	+		;  return a /* = 1 */;
+	cmp	#2		; case 2:
+	beq	+		;  return a /* = 2 */;
+	cmp	#4		; case 4:
+	beq	++		;  return a = 3;
+	cmp	#8		; case 8:
+	beq	+++		;  return a = 4;
+	lda	#0		; default:
++	and	#$ff		;
+	rts			;  return 0;
++	lda	#3		;
+	rts			;
++	lda	#4		; }
+	rts			;} // unambig()
 	
 officem
 threatm
