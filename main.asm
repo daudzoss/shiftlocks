@@ -112,7 +112,7 @@ topline	.text	"the crime scene     "
 .endif
 
 .include "gamerule.asm"		; tosolve, solvlen, gamewon()
-.include "playeras.asm"		; ability, abillen, invest2()
+.include "playeras.asm"		; ability, abillen, double1(), '2(), '3(), '4()
 
 SCREEND	= SCREENC-SCREENM
 SCRSIZE	= SCREENW*SCREENH
@@ -701,6 +701,17 @@ movepwr	pla;1->0		;   }
 	and	#$ff		;
 notmove	rts			;} // movedok()
 
+invest2	ror			;void invest2 (uint2_t a) {
+	ror			; // a will contain an investigation card (0~3)
+	ror			; // corresponding to a face value of 1~4
+	bit	*		; // that just completed a pair at the scene
+	bmi	++		; switch (a & 0x03) {
+	bvs	+		; case 0: double1();
+	jmp	double1		; case 1: double2();
++	jmp	double2		; case 2: double3();
++	bvs	+		; case 3: double4();
+	jmp	double3		; }
++	jmp	double4		;} // invest2()
 
 finishr	lda	#0		;void finishr(void) {
 -	pha			; register uint8_t a, x, y;

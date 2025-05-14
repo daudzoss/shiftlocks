@@ -10,4 +10,10 @@ ability	.byte	$09,$0e,$16,$05	; INVE
 	.byte	$20,$0f,$0e,$05	;  ONE
 +
 
-invest2	rts
+double1	rts			;
+
+double2	rts			;
+
+double3	rts			;
+
+double4	rts			;
