@@ -286,63 +286,70 @@ nummove	ldy	#0		;   nummove:
 	jmp	trymove		;
 
 notfkey	cmp	#$5f		; // <-
-	beq	+		;
+	beq	+		;   } else if (a == '<-' // Commodore back-arrow
 	cmp	#$1b		; // Esc
-	bne	++		;
+	bne	++		;              || a == '\033') // 264 & P500 Esc
 +	lda	#0		;
-	jsr	arrowky		;
+	jsr	arrowky		;    arrowky(0); // dehighlight cursor til arrow
 	jmp	getmove		;
 
 +	cmp	#$1d		; // R
-	bne	+++		;
+	bne	+++		;   } else if (a == 0x1d) { // right arrow
 	lda	ACURSOR		;
-	bne	+		;
-	lda	#8		;
-	bne	++		;
-+	lda	#$02		;
+	bne	+		;    if (!ACURSOR)
+	lda	#8		;     arrowky(8); // highlight F8
+	bne	++		;    else
++	lda	#$02		;     arrowky(+2); // next card to right
 +	jsr	arrowky		;
 	jmp	getmove		;
 	
 +	cmp	#$11		; // D
-	bne	+++		;
+	bne	+++		;   } else if (a == 0x11) { // down arrow
 	lda	ACURSOR		;
-	bne	+		;
-	lda	#4		;
-	bne	++		;
-+	lda	#$01		;
+	bne	+		;    if (!ACURSOR)
+	lda	#4		;     arrowky(4); // highlight F4
+	bne	++		;    else
++	lda	#$01		;     arrowky(+1); // next card down/right
 +	jsr	arrowky		;
 	jmp	getmove		;
 
 +	cmp	#$9d		; // L
-	bne	+++		;
+	bne	+++		;   } else if (a == 0x9d) { // left arrow
 	lda	ACURSOR		;
-	bne	+		;
-	lda	#1		;
-	bne	++		;
-+	lda	#$fe		;
+	bne	+		;    if (!ACURSOR)
+	lda	#1		;     arrowky(1); // highlight F1
+	bne	++		;    else
++	lda	#$fe		;     arrowky(-2); // next card to left
 +	jsr	arrowky		;
 	jmp	getmove		;
 
 +	cmp	#$91		; // U
-	bne	+++		;
+	bne	+++		;   } else if (a == 0x91) { // up arrow
 	lda	ACURSOR		;
-	bne	+		;
-	lda	#5		;
-	bne	++		;
-+	lda	#$ff		;
+	bne	+		;    if (!ACURSOR)
+	lda	#5		;     arrowky(5); // highlight F5
+	bne	++		;    else
++	lda	#$ff		;     arrowky(-1); // next card up/left
 +	jsr	arrowky		;
 	jmp	getmove		;
 	
 +	cmp	#$0d		; // Return
-	bne	notakey		;
+	bne	++		;   } else if (a == 0x1d) { // accept selection
 	lda	ACURSOR		;
 	bne	+		;
-	jmp	getmove		;
-+	clc			;
-	adc	#'0'		;
-	jmp	nummove		;
+	jmp	getmove		;    if (ACURSOR) {
++	clc			;     a += '0';
+	adc	#'0'		;     goto nummove; // re-use code above for 1-8
+	jmp	nummove		;    }
 
-notakey	jmp	getmove		;   } else /* handle other keys here, or */ continue;
++	and	#$df		;
+	cmp	#'q'		;
+	bne	notakey		;   } else if ((a &= 0xdf) == 'q') {// user quit
+	jsr	askquit		;
+	beq	notakey		;    if (askquit())
+	rts			;     return;
+
+notakey	jmp	getmove		;   } else /* handle others here or */ continue;
 
 trymove	and	#$03		;
 	tay			;
@@ -1009,6 +1016,31 @@ cardout	clc			;void cardout(register uint8_t& x,
 	bne	-		; }
 	rts			;} // cardout()
 
+				;uint1_t askquit(void) {
+askquit	handmsg	askmsg0,askmsg1-askmsg0,askmsg2-askmsg1,SCRATCH
+-	jsr	$ffe4		; handmsg("DISCARD & REDRAW?"/*RVS ON*/
+	beq	-		;         " PRESS Y FOR YES "/*RVS OFF*/, 17, 17,
+	and	#$df		;         SCRATCH);
+	cmp	#$59		; register uint8_t a = getchar();
+	php			;handmsg(SCRATCH, 17, 17); // pop backing store
+	handmsg	SCRATCH,askmsg1-askmsg0,askmsg2-askmsg1
+	plp			;
+	bne	quitn		;
+quity	lda	#1		;
+	rts			;
+quitn	lda	#0		; return (a & 0xdf == 'y');
+	rts			;} // askquit()
+askmsg0	.byte	$12,$05,$01,$0c	; REAL
+	.byte	$0c,$19,$20,$11	; LY Q
+	.byte	$15,$09,$14,$20	; UIT
+	.byte	$07,$01,$0d,$05	; GAME
+	.byte	$3f		; ?
+askmsg1	.byte	$a0,$90,$92,$85	;  PRE
+	.byte	$93,$93,$a0,$99	; SS Y 
+	.byte	$a0,$86,$8f,$92	;  FOR
+	.byte	$a0,$99,$85,$93	;  YES
+	.byte	$a0		;
+askmsg2	
 				;uint1_t animrej(void) {
 animrej	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("DISCARD & REDRAW?"/*RVS ON*/
