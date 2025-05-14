@@ -505,7 +505,7 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	tax			;  register uint2_t x = a & 0x03; // office slot
 	lda	TEMPVAR		;
 	bit	threatm		;
-	beq	++++		;  if (TEMPVAR & 0x04) { // threat card attempt
+	beq	playinv		;  if (TEMPVAR & 0x04) { // threat card attempt
 	jsr	unambig		;   x = unambig(); //check: is pile unambiguous?
 	bne	+		;   if (!x) // >1 pile is generally possible, so
 	jsr	oprompt		;   //unlike investigation card, prompt for pile
@@ -517,15 +517,46 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	lda	#0		;    return a = 0;
 	jmp	notmove		;   } else {
 +	dex			;    x--; // convert from pile 1~4 to offset 0~3
-+	lda	STACKHT+8,x	;   } // x no longer the card, but user's choice
+	lda	STACKHT+8,x	;   } // x no longer the card, but user's choice
 	bit	tisnext		;
-	bne	++		;   if (STACKHT[8+x]&1 == 0) {// but thr showing
+	bne	+		;   if (STACKHT[8+x]&1 == 0) {// but thr showing
 	pla;2->1		;
 	pla;1->0		;
 	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;    return a = 0;
-	jmp	notmove		;   } // FIXME:check this 4~7 not already present
-+	lda	STACKHT+8,x	;  } else { // trying to play investigation card
+	jmp	notmove		;   }
++	pla;2->1		;   // guaranteed STACKHT[8+x] is at least 1!
+	tay			;
+	pha;2:index in hand 0~3	;
+	lda	HAND,y		;
+	sta	TEMPVAR		;   TEMPVAR = HAND[y];
+	txa			;
+	pha;3:off. stack # 0 ~ 3;
+	asl			;
+	asl			;
+	asl			;
+	asl			;    //stack#, position above top card in stack
+	ora	STACKHT+8,x	;   a = x<<4 + STACKHT[8+x];
+	tay			;   register uint8_t y_ = a;
+	lda	STACKHT+8,x	;
+	tax			;   for (register uint8_t x_ = STACKHT[8+x]; x_;
+-	dey			;        x_--)
+	lda	ODRAWER,y	;
+	cmp	TEMPVAR		;    if (ODRAWER[y_--] == TEMPVAR)// oops! can't
+	beq	+		;     break;//since threat already in this stack
+	dex			;
+	bne	-		;
+	beq	++		;   if (x_ > 0) { // found a conflict
++	pla;3->2		;
+	pla;2->1		;
+	pla;1->0		;
+	inc	TOFFICE		;    TOFFICE++;
+	lda	#0		;    return a = 0;
+	jmp	notmove		;   }
++	pla;3->2		;
+	tax			;
+	jmp	+		;
+playinv	lda	STACKHT+8,x	;  } else { // trying to play investigation card
 	bit	tisnext		;   // which alternate so need stack height even
 	beq	+		;   if (STACKHT[8+x] & 1) {// but inv is showing
 	inc	TOFFICE		;    TOFFICE++;
@@ -539,9 +570,8 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	asl			;
 	asl			;
 	asl			;
-	asl			;
-	clc			;    //stack#, position in stack
-	adc	STACKHT+8,x	;  a = x<<4 + STACKHT[8+x];
+	asl			;    //stack#, position in stack
+	ora	STACKHT+8,x	;  a = x<<4 + STACKHT[8+x];
 	pha;2:index into ODRAWER;
 	inc	STACKHT+8,x	;  STACKHT[8+x]++;
 	txa			;
@@ -599,7 +629,9 @@ scenem	dec	TOSCENE		;
 	lda	TEMPVAR		;
 	jsr	cardsho		;   cardsho(0, TEMPVAR, stackx[x], stacky[x]);
 	jmp	movepwr		;  } else { // wounded from adding 2nd if threat
-+	pla;3->2		;
++	lda	#0		;
+	sta	STACKHT,x	;   STACKHT[x] = 0;// reset the height here to 0
+	pla;3->2		;
 	tax			;
 	pla;2->1		;
 	tay			;
