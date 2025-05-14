@@ -477,6 +477,9 @@ intohnd	and	#$07		;uint8_t intohnd(register uint3_t a)  {
 	tya			; return y; // returned HAND index 0 ~ 3
 +	rts			;} // intohnd()
 
+unambig	lda	#0		;uint3_t unambiguous(void) {
+	rts			;return 0;}
+	
 officem
 threatm
 	.byte	$04		;// card 0~3 crimescene, 4~7 office
@@ -502,9 +505,11 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	tax			;  register uint2_t x = a & 0x03; // office slot
 	lda	TEMPVAR		;
 	bit	threatm		;
-	beq	+++		;  if (TEMPVAR & 0x04) { // threat card
-	jsr	oprompt		;   // unlike investigation card, prompt for pile
-	tax			;   x = oprompt(); // threat to 1 ~ 4, 0 cancels
+	beq	++++		;  if (TEMPVAR & 0x04) { // threat card attempt
+	jsr	unambig		;   x = unambig(); //check: is pile unambiguous?
+	bne	+		;   if (!x) // >1 pile is generally possible, so
+	jsr	oprompt		;   //unlike investigation card, prompt for pile
++	tax			;    x = oprompt(); // threat to 1 ~ 4, 0 cancel
 	bne	+		;   if (x == 0) {
 	pla;2->1		;
 	pla;1->0		;
