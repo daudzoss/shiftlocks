@@ -477,7 +477,7 @@ intohnd	and	#$07		;uint8_t intohnd(register uint3_t a)  {
 	tya			; return y; // returned HAND index 0 ~ 3
 +	rts			;} // intohnd()
 
-unambig	lda	#0		;uint3_t unambiguous(void) {
+unambig	lda	#0		;uint3_t unambiguous(void) { // FIXME
 	rts			;return 0;}
 	
 officem
@@ -590,7 +590,7 @@ scenem	dec	TOSCENE		;
 	pha;3:x location of slot;
 	lda	STACKHT,x	;
 	cmp	#2		;
-	bcs	+		;  if (STACKHT[x] < 2) // initial harmless but..
+	bcs	+		;  if (STACKHT[x] < 2) // 1st card harmless, but
 	pla;3->2		;
 	tax			;
 	pla;2->1		;
@@ -598,14 +598,15 @@ scenem	dec	TOSCENE		;
 	clc			;
 	lda	TEMPVAR		;
 	jsr	cardsho		;   cardsho(0, TEMPVAR, stackx[x], stacky[x]);
-	jmp	movepwr		;  } else { // wounded from adding a second card
+	jmp	movepwr		;  } else { // wounded from adding 2nd if threat
 +	pla;3->2		;
 	tax			;
 	pla;2->1		;
 	tay			;
 	clc			;
-	lda	#NONCARD	;
+	lda	TEMPVAR		;
 	pha;2: card from hand	;
+	lda	#NONCARD	;
 	jsr	cardsho		;   cardsho(0, NONCARD, stackx[x], stacky[x]);
 	pla;2->1		;
 	pha;2: card from hand	;
