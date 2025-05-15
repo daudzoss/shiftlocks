@@ -7,7 +7,7 @@ tosolve	.byte	$33,$20,$03,$0f	; 3 CO
 +
 
 gamewon	ldy	#4		;uint1_t gamewon(void) {
-	ldx	#0		; uint2_t x;
+	ldx	#0		; uint2_t x = 0;
 -	lda	STACKHT+8-1,y	; for (uint8_t y = 4; y >= 1; y--) {
 	cmp	#7		;
 	bcc	+		;  if (STACKHT[(8-1)+y] >= 7) // enough for 4x i

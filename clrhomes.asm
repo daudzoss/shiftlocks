@@ -1,4 +1,4 @@
-;;; C. L. R. "Shiftlock" Home, solitary consulting detective
+;;; C. L. R. "Shiftlock" Home, Solitary consulting detective
 abillen	.byte	(+)-ability
 ability	.byte	$09,$0e,$16,$05	; INVE
 	.byte	$13,$14,$40,$20	; ST_
@@ -10,10 +10,10 @@ ability	.byte	$09,$0e,$16,$05	; INVE
 	.byte	$20,$0f,$0e,$05	;  ONE
 +
 
-double1	jmp	investr
+double1	jmp	inv_l2r
 
-double2	jmp	threatl
+double2	jmp	thr_r2l
 
-double3	jmp	investl
+double3	jmp	inv_r2l
 
 double4	jmp	findone

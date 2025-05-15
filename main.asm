@@ -347,14 +347,37 @@ notfkey	cmp	#$5f		; // <-
 	adc	#'0'		;     goto nummove; // re-use code above for 1-8
 	jmp	nummove		;    }
 
-+	and	#$df		;
++	cmp	#'q'|$20	;
+	beq	+		;
 	cmp	#'q'		;
-	bne	notakey		;   } else if ((a &= 0xdf) == 'q') {// user quit
-	jsr	askquit		;
+	bne	notakey		;   } else if (a == 'q' || a == 'Q') { //->BASIC
++	jsr	askquit		;
 	beq	notakey		;    if (askquit())
 	rts			;     return;
 
+.if 0
 notakey	jmp	getmove		;   } else /* handle others here or */ continue;
+.else
+notakey	cmp	#$21		;
+	bcc	+		;
+	cmp	#$29		;
+	bcs	+		;
+	ldx	#$16		;
+	ldy	#0		;
+	lda	#5		;
+	txtclip	notabuf		;
+	lda	#5		;
+	replace	notaneg		;
+	ldx	#5		;
+-	lda	notabuf-1,x	;
+	sta	notaneg-1,x	;
+	dex			;
+	bne	-		;
++	jmp	getmove		;   } else continue;
+notaneg	.byte	$20,$13,$08,$05	;
+	.byte	$12		;
+notabuf	.fill	5		;
+.endif
 
 trymove	and	#$03		;
 	tay			;
@@ -454,7 +477,7 @@ cursor0	txa			;void cursor1(register uint8_t x) {
 	sta	ARROWEV,x	;  ARROWEV[x] &= 0x7f;
 	rts			;}
 
-	
+
 fromhnd	and	#$03		;uint8_t fromhnd(register uint2_t a) {
 	tay			; uint8_t retval; // took HAND index 0 ~ 3
 fasthnd	lda	HAND,y		; retval = HAND[a & 0x03]; //in here if y passed
@@ -701,10 +724,14 @@ movepwr	pla;1->0		;   }
 	and	#$ff		;
 notmove	rts			;} // movedok()
 
-invest2	ror			;void invest2 (uint2_t a) {
+invest2	pha			;void invest2 (uint2_t a) {
+	jsr	animhnd		; animhnd(); // show gap for the played card
+	pla			;
+	ror			;
 	ror			; // a will contain an investigation card (0~3)
 	ror			; // corresponding to a face value of 1~4
-	bit	*		; // that just completed a pair at the scene
+	sta	TEMPVAR		;
+	bit	TEMPVAR		; // that just completed a pair at the scene
 	bmi	++		; switch (a & 0x03) {
 	bvs	+		; case 0: double1();
 	jmp	double1		; case 1: double2();
@@ -1172,19 +1199,125 @@ rejmsg1	.byte	$a0,$90,$92,$85	;  PRE
 rejmsg2	
 
 
-drawone	jsr	drw1new		;void drawone(void) { drw1new(); animhnd();
+drawone	jsr	drw1new		;void drawone(void) { int8_t a = drw1new();
+.if 1
+	bpl	+		; if (a < 0) { draw deck empty?!? impossible?!?
+	inc	NWOUNDS		;  NWOUNDS++;
+	digitxy	NWOUNDS,WDX,WDY	;  digitxy(NWOUNDS, WDX, WDY);
+	rts			;  return;
+.endif
++	jsr	intohnd		; } else intohnd(a);
 	jmp	animhnd		;} // drawone()
 
-;;;//FIXME
-findone	rts
 
-threatl	rts
+arwstat	.byte	$ff
+arwchar	.byte	$e9,$df,$5f,$69
+nxtchar	.byte	+SCREENW-1,+4,+SCREENW-4,+4
+arwdisc	sta	TEMPVAR		;void arwdisc(uint8_t& a) {
+	ldx	discx		; TEMPVAR = a;
+	ldy	discy		; register uint8_t x = *discx + *discy *SCREENW;
+.if 0
+	beq	+		;
+-	clc			;
+	adc	#SCREENW	;
+	dey			;
+	bne	-		;
++
+.endif	
+-	txa			; for (uint8_t y = 0; y < 4; y++) {
+	clc			;
+	adc	nxtchar,y	;
+	tax			;  x += nxtchar[y];
+	lda	TEMPVAR		;
+	and	#$20		;
+	bne	+		;
+	lda	arwchar,y	;
++	sta	SCREENM,x	;  SCREENM[x] = (TEMPVAR&0x20) ? ' ':arwchar[y];
+	iny			;
+	cpy	#4		;
+	bne	-		; }
+	rts			;} // arwdisc()
 
-threatr rts
+findone ldx	DISCREM		;void findone(void) {
+	bne	canfind		; if (DISCREM == 0) { // must draw, but can't
+	inc	NWOUNDS		;  NWOUNDS++;
+	digitxy	NWOUNDS,WDX,WDY	;  digitxy(NWOUNDS, WDX, WDY);
+	rts			;  return;
+canfind	cpx	#1		; }
+	bne	+		;
+	jmp	discar1		; if (DISCREM > 1) { // able to choose so prompt
++	lda	#0		;
+	jsr	arwdisc		;  arwdisc(0); // draw L/R arrows beside discard
+	handmsg	fndmsg0,0,fndmsg1-fndmsg0,SCRATCH
+getfind	jsr	$ffe4		;  do {
+	beq	getfind		;   uint8_t a = getchar();
+	cmp	#$9d		;
+	bne	+		;   if (a == 0x9d) { // L arrow cycle pile down
 
-investl	rts
+	ldy	#1		;
+	ldx	#0		;    register int8_t x = 0; // > 1 index needed?
+	lda	discard		;
+	sta	TEMPVAR		;    TEMPVAR = discard[0]; // save for [DISCREM]
+-	lda	discard,y	;    for (register int8_t y = 1; y<DISCREM; y++)
+	sta	discard,x	;     discard[x++] = discard[y]; // next-higher
+	inx			;
+	iny			;
+	cpy	DISCREM		;
+	bcc	-		;
+	lda	TEMPVAR		;
+	sta	discard,x	;    discard[/* x =*/ DISCREM - 1] = TEMPVAR;   
+	jsr	discsho		;
+	jmp	getfind		;
 
-investr rts
++	cmp	#$1d		;
+	bne	+		;   } else if (a == 0x1d) { // R arrow cycle up
+
+	lda	DISCREM		;
+	tay			;
+	dey			;
+	tax			;
+	dex			;    register int8_t x = DISCREM - 1;//>1 index?
+	beq	getfind		;
+	lda	discard,x	;
+	sta	TEMPVAR		;    TEMPVAR = discard[x]; // save top for [0]
+	dey			;    for (register int8_t y = x-1; y > 0; y --)
+-	lda	discard,y	;
+	sta	discard,x	;     discard[x--] = discard[y]; // next-lower
+	dey			;
+	dex			;
+	bne	-		;
+	lda	TEMPVAR		;
+	sta	discard;,x	;    discard[/* x =*/ 0] = TEMPVAR;
+	jsr	discsho		;
+	jmp	getfind		;
+
++	cmp	#$0d		;
+	bne	getfind		;   } else if (a == '\r') { // Return to select
+	handmsg	SCRATCH,0,fndmsg1-fndmsg0
+	lda	#$20		;    arwdisc(' '); // blank the pile L/R arrows
+	jsr	arwdisc		;    break;
+	ldx	DISCREM		;   }
+discar1	dex			;  }
+	stx	DISCREM		; }
+	lda	discard,x	;
+	jsr	intohnd		; intohnd(discard[--DISCREM]);
+	jsr	discsho		; discsho();
+	jsr	animhnd		; animhnd();
+	rts			;} // findone()
+fndmsg0	.byte	$8c,$af,$92,$80	; L/R
+	.byte	$81,$92,$92,$8f	; ARRO
+	.byte	$97,$93,$ac,$92	; WS,R
+	.byte	$85,$94,$95,$92	; ETUR
+	.byte	$8e		; N
+fndmsg1				;//FIXME - static storage - not reentrant!
+
+thr_l2r rts
+
+thr_r2l	rts
+
+inv_l2r	rts
+
+inv_r2l rts
 ;;;//FIXME
 				;uint8_t warning(void) {
 warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
@@ -1214,9 +1347,9 @@ wrnmsg2
 
 
 oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
-	ldx	#$15		;uint8_t oprompt(void) { do {register uint8_t a;
-	ldy	#$00		;
-	lda	#offmsg1-offmsg0;
+	ldx	#$15		;uint8_t oprompt(void) {
+	ldy	#$00		; do {
+	lda	#offmsg1-offmsg0;  register uint8_t a;
 	txtclip	SCRATCH		;
 	lda	#offmsg1-offmsg0;
 	replace	offmsg0		;
