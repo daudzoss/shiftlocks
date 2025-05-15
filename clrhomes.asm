@@ -10,10 +10,10 @@ ability	.byte	$09,$0e,$16,$05	; INVE
 	.byte	$20,$0f,$0e,$05	;  ONE
 +
 
-double1	rts			;
+double1	jmp	investr
 
-double2	rts			;
+double2	jmp	threatl
 
-double3	rts			;
+double3	jmp	investl
 
-double4	rts			;
+double4	jmp	findone

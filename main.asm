@@ -307,7 +307,7 @@ notfkey	cmp	#$5f		; // <-
 +	lda	#$02		;     arrowky(+2); // next card to right
 +	jsr	arrowky		;
 	jmp	getmove		;
-	
+
 +	cmp	#$11		; // D
 	bne	+++		;   } else if (a == 0x11) { // down arrow
 	lda	ACURSOR		;
@@ -337,7 +337,7 @@ notfkey	cmp	#$5f		; // <-
 +	lda	#$ff		;     arrowky(-1); // next card up/left
 +	jsr	arrowky		;
 	jmp	getmove		;
-	
+
 +	cmp	#$0d		; // Return
 	bne	++		;   } else if (a == 0x1d) { // accept selection
 	lda	ACURSOR		;
@@ -453,7 +453,7 @@ cursor0	txa			;void cursor1(register uint8_t x) {
 	and	#$7f		;
 	sta	ARROWEV,x	;  ARROWEV[x] &= 0x7f;
 	rts			;}
-	
+
 	
 fromhnd	and	#$03		;uint8_t fromhnd(register uint2_t a) {
 	tay			; uint8_t retval; // took HAND index 0 ~ 3
@@ -512,7 +512,7 @@ unambig	lda	#0		;uint3_t unambig(void) {
 	rts			;
 +	lda	#4		; }
 	rts			;} // unambig()
-	
+
 officem
 threatm
 	.byte	$04		;// card 0~3 crimescene, 4~7 office
@@ -1154,7 +1154,7 @@ animrej	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
 +
 	stx	DISCREM		;  DISCREM = x;
 	jsr	discsho		;  discsho();
-	
+
 rejecty	lda	#1		;  return 1;
 	rts			; } else
 rejectn	lda	#0		;  return 0;
@@ -1171,6 +1171,21 @@ rejmsg1	.byte	$a0,$90,$92,$85	;  PRE
 	.byte	$a0		;
 rejmsg2	
 
+
+drawone	jsr	drw1new		;void drawone(void) { drw1new(); animhnd();
+	jmp	animhnd		;} // drawone()
+
+;;;//FIXME
+findone	rts
+
+threatl	rts
+
+threatr rts
+
+investl	rts
+
+investr rts
+;;;//FIXME
 				;uint8_t warning(void) {
 warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("CANNOT PLAY THERE"/*RVS ON*/
@@ -1345,7 +1360,7 @@ b_pairg	.byte	$10,$01,$09,$12	; PAIR
 	.byte	$20,$12,$15,$0c	;  RUL
 	.byte	$05,$13,$3a,$20	; ES:
 +
-	
+
 petscii	.text	$09,$83,$08	; enable upper/lower case, uppercase, lock upper
 	.text	$13,$13		; clear any BASIC 3.5/4 subwindows on the screen
 
