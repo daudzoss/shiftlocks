@@ -550,7 +550,7 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	cpy	HANDREM		;
 	bne	+		;   if (TOSCENE == HANDREM) // and rest of hand:
 	lda	#0		;// required to meet minimum of 2 played TOSCENE
-	jmp	notmove		;    return a = 0; // z set
+	rts			;    return a = 0; // z set
 +	pha;1:0~3 to cs, 4~7 of.;  }
 	and	#$03		;
 	tay			;  register uint2_t y = a & 0x03; // hand slot
@@ -571,7 +571,7 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	pla;1->0		;
 	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;    return a = 0;
-	jmp	notmove		;   } else {
+	rts			;   } else {
 +	dex			;    x--; // convert from pile 1~4 to offset 0~3
 	lda	STACKHT+8,x	;   } // x no longer the card, but user's choice
 	bit	tisnext		;
@@ -580,7 +580,7 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	pla;1->0		;
 	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;    return a = 0;
-	jmp	notmove		;   }
+	rts			;   }
 +	pla;2->1		;   // guaranteed STACKHT[8+x] is at least 1!
 	tay			;
 	pha;2:index in hand 0~3	;
@@ -608,18 +608,18 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	pla;1->0		;
 	inc	TOFFICE		;    TOFFICE++;
 	lda	#0		;    return a = 0;
-	jmp	notmove		;   }
+	rts			;   }
 +	pla;3->2		;
 	tax			;
 	jmp	+		;
 playinv	lda	STACKHT+8,x	;  } else { // trying to play investigation card
 	bit	tisnext		;   // which alternate so need stack height even
 	beq	+		;   if (STACKHT[8+x] & 1) {// but inv is showing
-	inc	TOFFICE		;    TOFFICE++;
-	lda	#0		;
 	pla;2->1		;
 	pla;1->0		;
-	jmp	notmove		;    return a = 0;
+	inc	TOFFICE		;    TOFFICE++;
+	lda	#0		;
+	rts			;    return a = 0;
 +	pla;2->1		;   }
 	tay			;  }
 	txa			;
@@ -663,7 +663,7 @@ scenem	dec	TOSCENE		;
 	cpy	HANDREM		;
 	bne	+		;   if (TOFFICE == HANDREM) // and rest of hand:
 	lda	#0		;// required to meet minimum of 2 played TOFFICE
-	jmp	notmove		;    return a = 0; // z set
+	rts			;    return a = 0; // z set
 +	pha;1:0~3 to cs, 4~7 of.;  }
 	;and	#$03		;
 	jsr	fromhnd		;
@@ -722,7 +722,7 @@ movepwr	pla;1->0		;   }
 	dey			;
 	bne	-		; return 1<<a; // z clear
 	and	#$ff		;
-notmove	rts			;} // movedok()
+	rts			;} // movedok()
 
 invest2	pha			;void invest2 (uint2_t a) {
 	jsr	animhnd		; animhnd(); // show gap for the played card
