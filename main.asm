@@ -1305,11 +1305,15 @@ fndmsg0	.byte	$8c,$af,$92,$80	; L/R
 	.byte	$8e		; N
 fndmsg1				;//FIXME - static storage - not reentrant!
 
-thr_l2r rts
+inv_l2r	lda	#0		;
+	jmp	pickl2r		;
 
+thr_l2r lda	#4		;
+	jmp	pickl2r		;
+
+pickl2r	rts			;
+	
 thr_r2l	rts
-
-inv_l2r	rts
 
 inv_r2l rts
 ;;;//FIXME
