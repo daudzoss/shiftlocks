@@ -514,11 +514,11 @@ unambig	lda	#0		;uint3_t unambig(void) {
 	plp			;
 	ror			;  a = ((STACKHT[8+x-1] & 1) << 7) | (a >> 1);
 	inx			;
-	cpx	#5		; }
-	bne	-		;
-	lsr			;
-	lsr			;
-	lsr			;
+	cpx	#5		;
+	bne	-		; }
+	lsr			; // if a!=0 we have identified the one possible
+	lsr			; // office stack for a threat because of unique
+	lsr			; // investigation card showing, so avoid prompt
 	lsr			; switch (a >> 4) {
 	cmp	#1		; case 1:
 	beq	+		;  return a /* = 1 */;
@@ -1255,17 +1255,15 @@ getfind	jsr	$ffe4		;  do {
 	bne	+		;   if (a == 0x9d) { // L arrow cycle pile down
 
 	ldy	#1		;
-	ldx	#0		;    register int8_t x = 0; // > 1 index needed?
 	lda	discard		;
 	sta	TEMPVAR		;    TEMPVAR = discard[0]; // save for [DISCREM]
 -	lda	discard,y	;    for (register int8_t y = 1; y<DISCREM; y++)
-	sta	discard,x	;     discard[x++] = discard[y]; // next-higher
-	inx			;
+	sta	discard-1,y	;     discard[y] = discard[y+1]; // next-highest
 	iny			;
 	cpy	DISCREM		;
 	bcc	-		;
 	lda	TEMPVAR		;
-	sta	discard,x	;    discard[/* x =*/ DISCREM - 1] = TEMPVAR;   
+	sta	discard-1,y	;    discard[(/* y =*/ DISCREM) - 1] = TEMPVAR;   
 	jsr	discsho		;
 	jmp	getfind		;
 
@@ -1275,19 +1273,15 @@ getfind	jsr	$ffe4		;  do {
 	lda	DISCREM		;
 	tay			;
 	dey			;
-	tax			;
-	dex			;    register int8_t x = DISCREM - 1;//>1 index?
 	beq	getfind		;
-	lda	discard,x	;
-	sta	TEMPVAR		;    TEMPVAR = discard[x]; // save top for [0]
-	dey			;    for (register int8_t y = x-1; y > 0; y --)
--	lda	discard,y	;
-	sta	discard,x	;     discard[x--] = discard[y]; // next-lower
+	lda	discard,y	;
+	sta	TEMPVAR		;    TEMPVAR = discard[DISCREM-1]; // for [0]
+-	lda	discard-1,y	;    for (register int8_t y = DISCREM-1;y>0;y--)
+	sta	discard,y	;     discard[y-1] = discard[y]; // next-lowest
 	dey			;
-	dex			;
 	bne	-		;
 	lda	TEMPVAR		;
-	sta	discard;,x	;    discard[/* x =*/ 0] = TEMPVAR;
+	sta	discard;,y	;    discard[/* y =*/ 0] = TEMPVAR;
 	jsr	discsho		;
 	jmp	getfind		;
 
