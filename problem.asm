@@ -14,10 +14,10 @@ gamewon	ldx	#1		;uint1_t gamewon(void) {
 	pha;1:current stack# 1~4;
 	tay			;  int8_t y_ = STACKHT[(8-1)+y]; // stacks 8~11
 	cpy	#7		;
-	bcc	+++++		;  if (y_ >= 7) { // enough to have 4x investig.
+	bcc	++		;  if (y_ >= 7) { // enough to have 4x investig.
 -	lda	ODRAWER,x	;   for (register uint8_t x = 0; x < 15; x+=2) {
 	and	#$04		;    if (ODRAWER[(y*16 + x) | 1] & 0x04) // odds
-	bne	++++		;     break; // threat, skip stack!
+	bne	-		;     break; // threat, skip stack!
 	inx			;
 	inx			;
 	dey			;
