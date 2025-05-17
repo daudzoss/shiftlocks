@@ -1307,21 +1307,60 @@ discar1	dex			;  }
 	jsr	discsho		; discsho();
 	jsr	animhnd		; animhnd();
 	rts			;} // findone()
-fndmsg0	.byte	$8c,$af,$92,$80	; L/R
+fndmsg0	.byte	$8c,$af,$92,$a0	; L/R
 	.byte	$81,$92,$92,$8f	; ARRO
 	.byte	$97,$93,$ac,$92	; WS,R
 	.byte	$85,$94,$95,$92	; ETUR
 	.byte	$8e		; N
 fndmsg1				;//FIXME - static storage - not reentrant!
 
-inv_l2r	lda	#0		;
-	jmp	pickl2r		;
+inv_l2r	lda	#0		;void inv_l2r(void) { pickl2r(0);
+	jsr	pickl2r		;} // inv_l2r()
+ 	jmp	sendl2r		
 
-thr_l2r lda	#4		;
-	jmp	pickl2r		;
+thr_l2r lda	#4		;void thr_l2r(void) { pickl2r(4);
+	jsr	pickl2r		;} // thr_l2r()
+ 	jmp	sendl2r		;
 
-pickl2r	rts			;
+TOP_ROW	= SCREENM+SCREENW*1
+BOT_ROW	= SCREENM+SCREENW*9
+
+pickl2r	tax			;void pickl2r(register uint8_t a) { // a==0 or 4
+-	lda	STACKHT,x	; for (register uint8_t x = a; x < a + 4; x++) {
+	bne	+		;  if (STACKHT[x] > 0) break;
+	inx			;
+	txa			;
+	and	#$03		;
+	bne	-		; }
+	inc	NWOUNDS		; if (x == a + 4) {
+	digitxy	NWOUNDS,WDX,WDY	;  digitxy(++NWOUNDS, WDX, WDY);
+	rts			;  return;
++	txa			; }
+	pha			;
+	handmsg	plrmsg0,plrmsg1-plrmsg0,plrmsg2-plrmsg1,SCRATCH
+	pla			;
+	tax			;
+	cpx	#$04		;
+	bcc	pickbot		; if (x >= 4) // threats in top row
+	pick_sc	TOP_ROW		;  return pick_sc(TOP_ROW, x);
+	rts			; else 
+pickbot	pick_sc	BOT_ROW		;  return pick_sc(BOT_ROW, x);
+picktor	handmsg	SCRATCH,plrmsg1-plrmsg0,plrmsg2-plrmsg1
+	rts			;} // pickl2r()
+plrmsg0	.byte	$17,$08,$09,$03	; WHIC
+	.byte	$08,$20,$0f,$0e	; H ON
+	.byte	$05,$20,$14,$0f	; E TO
+	.byte	$20,$15,$13,$05	;  USE
+	.byte	$3f		; ?
+plrmsg1	.byte	$8c,$af,$92,$a0	; L/R
+	.byte	$81,$92,$92,$8f	; ARRO
+	.byte	$97,$93,$ac,$92	; WS,R
+	.byte	$85,$94,$95,$92	; ETUR
+	.byte	$8e		; N
+plrmsg2
 	
+sendl2r	rts
+
 thr_r2l	rts
 
 inv_r2l rts

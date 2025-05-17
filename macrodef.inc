@@ -103,3 +103,71 @@ digitxy	.macro	d,x,y,mask0f=$8f;inline void digitxy(const uint8_t* d, const
 	ora	#$30		; SCREENM[x+SCREENW*y] = a | *d | '0';
 	sta SCREENM+\x+SCREENW*\y
 	.endm			;} // digitxy()
+
+pick_sc	.macro	row		;inline uint8_t pick_sc(uint8_t* row, register
+-	txa			;                       uint8_t x /* 0 ~ 7 */) {
+	and	#$03		; while (1) {
+	asl			;  register uint8_t a, y;
+	asl			;
+	tay			;  y = (x & 3) * 4; // column of card upper-left
+	iny			;
+	lda	#$7f		;
+	and	\row,y		;
+	sta	\row,y		;  row[++y] &= 0x7f;// normal video (de-reverse)
+	iny			;
+	lda	#$7f		;
+	and	\row,y		;
+	sta	\row,y		;  row[++y] &= 0x7f;// normal video (de-reverse)
+	tya			;
+	pha			;
+	txa			;
+	pha			;
+-	jsr	$ffe4		;
+	sta	TEMPVAR		;  uint8_t TEMPVAR;
+	beq	-		;  a = getchar();
+	pla			;
+	tax			;
+	pla			;
+	tay			;
+	lda	#$80		;
+	ora	\row,y		;
+	sta	\row,y		;  row[y--] |= 0x80; // re-reverse video of card
+	dey			;
+	lda	#$80		;
+	ora	\row,y		;
+	sta	\row,y		;  row[y--] |= 0x80; // re-reverse video of card
+	lda	TEMPVAR		;
+	stx	TEMPVAR		;  int8_t TEMPVAR = x;
+
+	cmp	#$9d		;  if (a == 0x9d) { // L
+	bne	++		;
+-	txa			;   do {
+	and	#$03		;
+	bne	+		;    if (x & 0x03 == 0) {//0,4 leftmost already
+	ldx	TEMPVAR		;     x = TEMPVAR;
+	jmp	---		;     break; // back to top, re-highlight card
++	dex			;    }
+	lda	STACKHT,x	;
+	bne	---		;
+	beq	-		;   } while (STACKHT[--x] == 0); // any to left?
+
++	cmp	#$1d		;  } else if (a == 0x1d) { // R
+	bne	++		;
+-	txa			;   do {
+	and	#$03		;
+	cmp	#$03		;
+	bne	+		;    if (x & 0x03 == 3) {//3,7 rightmost already
+	ldx	TEMPVAR		;     x = TEMPVAR;
+	jmp	----		;     break; // back to top, re-highlight card
++	inx			;    }
+	lda	STACKHT,x	;
+	bne	----		;
+	beq	-		;   } while (STACKHT[++x] == 0);// any to right?
+	
++	cmp	#$0d		;  } else if (a == 0x0d) // Return
+	bne	----		;   return a = x;
+	txa			; }
+	.endm			;} // pick_sc()
+	
+	
+
