@@ -104,8 +104,8 @@ digitxy	.macro	d,x,y,mask0f=$8f;inline void digitxy(const uint8_t* d, const
 	sta SCREENM+\x+SCREENW*\y
 	.endm			;} // digitxy()
 
-pick_sc	.macro	row		;inline uint8_t pick_sc(uint8_t* row, register
--	txa			;                       uint8_t x /* 0 ~ 7 */) {
+pick_cs	.macro	row		;inline uint3_t pick_cs(uint8_t* row, register
+-	txa			;                       uint3_t x /* 0 ~ 7 */) {
 	and	#$03		; while (1) {
 	asl			;  register uint8_t a, y;
 	asl			;
@@ -163,11 +163,8 @@ pick_sc	.macro	row		;inline uint8_t pick_sc(uint8_t* row, register
 	lda	STACKHT,x	;
 	bne	----		;
 	beq	-		;   } while (STACKHT[++x] == 0);// any to right?
-	
+
 +	cmp	#$0d		;  } else if (a == 0x0d) // Return
 	bne	----		;   return a = x;
 	txa			; }
-	.endm			;} // pick_sc()
-	
-	
-
+	.endm			;} // pick_cs()

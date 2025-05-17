@@ -541,7 +541,7 @@ threatm
 	.byte	$04		;// card 0~3 crimescene, 4~7 office
 tisnext	.byte	$01		;// height LSB 0 invest next, 1 threat next
 
-move_of	pha;1:0~3 to cs, 4~7 of.;uint8_t move_of(register uint3_t a) {
+move_of	pha;1:4~7 since move_of	;uint8_t move_of(register uint3_t a) {
 	and	#$03		;
 	tay			; register uint2_t y = a & 0x03; // hand slot
 	pha;2:index in hand 0~3	;
@@ -649,7 +649,7 @@ playinv	lda	STACKHT+8,x	; } else { // trying to play investigation card
 	ldx	#1		; // clear z flag to indicate succesful exit
 	rts			;} // move_of()
 
-move_sc	pha;1:0~3 to cs, 4~7 of.;uint8_t move_sc(register uint3_t a) {
+move_cs	pha;1:0~3 since move_cs	;uint8_t move_cs(register uint3_t a) {
 	;and	#$03		;
 	jsr	fromhnd		;
 	sta	TEMPVAR		; TEMPVAR = fromhnd(a);// card taken from hand,
@@ -699,7 +699,7 @@ move_sc	pha;1:0~3 to cs, 4~7 of.;uint8_t move_sc(register uint3_t a) {
 	jmp	++		;  } else // may re-call movedok() re-entrant
 +	jsr	invest2		;   invest2(a); } } //defined in playeras.asm
 +	pla;1->0		; return a = y;
-	rts			;} // move_of()
+	rts			;} // move_cs()
 
 movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	beq	++		; if (a & 0x04) { // trying dec TOFFICE first,
@@ -722,7 +722,7 @@ movedok	bit	officem		;uint8_t movedok(register uint8_t& a) {
 	bne	+		;   if (TOFFICE == HANDREM) // and rest of hand:
 	lda	#0		;// required to meet minimum of 2 played TOFFICE
 	rts			;    return a = 0; // z set
-+	jsr	move_sc		;  } else move_sc(a);//no check, is always valid
++	jsr	move_cs		;  } else move_cs(a);//no check, is always valid
 movepwr	tay			; }
 	iny			;
 	lda	#0		;
@@ -1314,38 +1314,57 @@ fndmsg0	.byte	$8c,$af,$92,$a0	; L/R
 	.byte	$8e		; N
 fndmsg1				;//FIXME - static storage - not reentrant!
 
-inv_l2r	lda	#0		;void inv_l2r(void) { pickl2r(0);
-	jsr	pickl2r		;} // inv_l2r()
- 	jmp	sendl2r		
+inv_l2r	lda	#0		;void inv_l2r(void) {
+	jsr	pickl2r		; register uint4_t a = pickl2r(0);
+	cmp	#NONCARD	;
+	beq	+		; if (a != NONCARD)
+ 	jsr	sendl2r		;  sendl2r(a);
++	rts			;} // inv_l2r()
 
-thr_l2r lda	#4		;void thr_l2r(void) { pickl2r(4);
-	jsr	pickl2r		;} // thr_l2r()
- 	jmp	sendl2r		;
+thr_l2r lda	#4		;void thr_l2r(void) {
+	jsr	pickl2r		; register uint4_t a = pickl2r(4);
+	cmp	#NONCARD	;
+	beq	+		; if (a != NONCARD)
+ 	jsr	sendl2r		;  sendl2r(a);
++	rts			;} // thr_l2r()
 
 TOP_ROW	= SCREENM+SCREENW*1
 BOT_ROW	= SCREENM+SCREENW*9
 
-pickl2r	tax			;void pickl2r(register uint8_t a) { // a==0 or 4
--	lda	STACKHT,x	; for (register uint8_t x = a; x < a + 4; x++) {
+pickl2r	tax			;uint4_t pickl2r(register uint3_t a) { // a={0,4}
+-	lda	STACKHT,x	; for (register uint4_t x = a; x < a + 4; x++) {
 	bne	+		;  if (STACKHT[x] > 0) break;
 	inx			;
 	txa			;
 	and	#$03		;
 	bne	-		; }
 	inc	NWOUNDS		; if (x == a + 4) {
-	digitxy	NWOUNDS,WDX,WDY	;  digitxy(++NWOUNDS, WDX, WDY);
-	rts			;  return;
+	digitxy	NWOUNDS,WDX,WDY	;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
+	lda	#NONCARD	;
+	rts			;  return NONCARD;
 +	txa			; }
 	pha			;
 	handmsg	plrmsg0,plrmsg1-plrmsg0,plrmsg2-plrmsg1,SCRATCH
 	pla			;
 	tax			;
 	cpx	#$04		;
-	bcc	pickbot		; if (x >= 4) // threats in top row
-	pick_sc	TOP_ROW		;  return pick_sc(TOP_ROW, x);
-	rts			; else 
-pickbot	pick_sc	BOT_ROW		;  return pick_sc(BOT_ROW, x);
-picktor	handmsg	SCRATCH,plrmsg1-plrmsg0,plrmsg2-plrmsg1
+	bcc	pickbot		; if (x >= 4) // threat cards in top row
+	pick_cs	TOP_ROW		;  a = x = pick_cs(TOP_ROW, x);
+	jmp	picktor		; else // investigation cards in bottom row
+pickbot	pick_cs	BOT_ROW		;  a = x = pick_cs(BOT_ROW, x);
+picktor	;php			;
+	pha			;
+	;tax			;
+	lda	stacky,x	;
+	tay			;
+	lda	stackx,x	;
+	tax			;
+	lda	#NONCARD	;
+	clc			;
+	jsr	cardsho		; cardsho(0, NONCARD, stackx[x], stacky[x]);
+	handmsg	SCRATCH,plrmsg1-plrmsg0,plrmsg2-plrmsg1
+	pla			; return a;
+	;plp			;
 	rts			;} // pickl2r()
 plrmsg0	.byte	$17,$08,$09,$03	; WHIC
 	.byte	$08,$20,$0f,$0e	; H ON
@@ -1358,13 +1377,18 @@ plrmsg1	.byte	$8c,$af,$92,$a0	; L/R
 	.byte	$85,$94,$95,$92	; ETUR
 	.byte	$8e		; N
 plrmsg2
-	
-sendl2r	rts
 
-thr_r2l	rts
+sendl2r jsr	intohnd		;void sendl2r(register uint8_t a) {
+	jsr	move_of		;
+	bne	+		; if (move_of(intohnd(a)) == 0) { // FIXME: no check of -1
+	dec	TOFFICE		;  TOFFICE--; // undo spurious inc by move_of()
+	inc	NWOUNDS		;  digitxy(++NWOUNDS, WDX, WDY); } // FIXME: digitxy() redundant?
+	digitxy	NWOUNDS,WDX,WDY	; }
++	rts			;} // sendl2r()
 
-inv_r2l rts
 ;;;//FIXME
+thr_r2l	rts
+inv_r2l rts
 				;uint8_t warning(void) {
 warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("CANNOT PLAY THERE"/*RVS ON*/
