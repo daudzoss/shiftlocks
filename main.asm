@@ -502,7 +502,7 @@ intohnd	and	#$07		;uint8_t intohnd(register uint3_t a)  {
 	bmi	++		;  return -1; // returned negative if hand full
 +	sta	HAND-1,y	; HAND[y] = a;
 	inc	HANDREM		; HANDREM++;
-	tya			; return y; // returned HAND index 0 ~ 3
+	tya			; return y; // returned HAND index 1 ~ 4
 +	rts			;} // intohnd()
 
 unambig	lda	#0		;uint3_t unambig(void) {
@@ -1316,22 +1316,18 @@ fndmsg1				;//FIXME - static storage - not reentrant!
 
 inv_l2r	lda	#0		;void inv_l2r(void) {
 	jsr	pickl2r		; register uint4_t a = pickl2r(0);
-	cmp	#NONCARD	;
-	beq	+		; if (a != NONCARD)
- 	jsr	sendl2r		;  sendl2r(a);
-+	rts			;} // inv_l2r()
+ 	jmp	sendl2r		; return sendl2r(a);
+	;rts			;} // inv_l2r()
 
 thr_l2r lda	#4		;void thr_l2r(void) {
 	jsr	pickl2r		; register uint4_t a = pickl2r(4);
-	cmp	#NONCARD	;
-	beq	+		; if (a != NONCARD)
- 	jsr	sendl2r		;  sendl2r(a);
-+	rts			;} // thr_l2r()
+ 	jmp	sendl2r		; return sendl2r(a);
+	;rts			;} // thr_l2r()
 
 TOP_ROW	= SCREENM+SCREENW*1
 BOT_ROW	= SCREENM+SCREENW*9
 
-pickl2r	tax			;uint4_t pickl2r(register uint3_t a) { // a={0,4}
+pickl2r	tax			;uint4_t pickl2r(register uint3_t a) {// a={0,4}
 -	lda	STACKHT,x	; for (register uint4_t x = a; x < a + 4; x++) {
 	bne	+		;  if (STACKHT[x] > 0) break;
 	inx			;
@@ -1378,11 +1374,17 @@ plrmsg1	.byte	$8c,$af,$92,$a0	; L/R
 	.byte	$8e		; N
 plrmsg2
 
-sendl2r jsr	intohnd		;void sendl2r(register uint8_t a) {
-	jsr	move_of		;
-	bne	+		; if (move_of(intohnd(a)) == 0) { // FIXME: no check of -1
+sendl2r	cmp	#NONCARD	;void sendl2r(register uint8_t a) {
+	beq	+		; if (a == NONCARD) return; // FIXME: no wound?
+	jsr	intohnd		; a = intohnd(a);// momentary hand slot 1 ~ 4
+	sec			; // 1,2,3,4
+	sbc	#1		; a--; // 0,1,2,3
+	;sec			;
+	rol			; a = (a << 1) | 1; // spoof hand play to office
+	jsr	move_of		; // 1,3,5,7
+	bne	+		; if (move_of(a) == 0) {//FIXME?: -1 not checked
 	dec	TOFFICE		;  TOFFICE--; // undo spurious inc by move_of()
-	inc	NWOUNDS		;  digitxy(++NWOUNDS, WDX, WDY); } // FIXME: digitxy() redundant?
+	inc	NWOUNDS		;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
 	digitxy	NWOUNDS,WDX,WDY	; }
 +	rts			;} // sendl2r()
 
