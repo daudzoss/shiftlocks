@@ -475,7 +475,7 @@ cursor0	txa			;void cursor1(register uint8_t x) {
 +	lda	ARROWEV,x	;
 	and	#$7f		;
 	sta	ARROWEV,x	;  ARROWEV[x] &= 0x7f;
-	rts			;}
+	rts			;} // arrowky()
 
 
 fromhnd	and	#$03		;uint8_t fromhnd(register uint2_t a) {
@@ -544,11 +544,11 @@ tisnext	.byte	$01		;// height LSB 0 invest next, 1 threat next
 move_of	pha;1:4~7 since move_of	;uint8_t move_of(register uint3_t a) {
 	and	#$03		;
 	tay			; register uint2_t y = a & 0x03; // hand slot
-	pha;2:index in hand 0~3	;
-	lda	HAND,y		; TEMPVAR = a = HAND[y]; // card 0 ~ 7
+	pha;2:index in hand 0~3	; register uint8_t a_;
+	lda	HAND,y		; TEMPVAR = a_ = HAND[y]; // card 0 ~ 7
 	sta	TEMPVAR		;
 	and	#$03		;
-	tax			; register uint2_t x = a & 0x03; // office slot
+	tax			; register uint2_t x = a_& 0x03; // office slot
 	lda	TEMPVAR		;
 	bit	threatm		;
 	beq	playinv		; if (TEMPVAR & 0x04) { // threat card attempt
@@ -560,7 +560,7 @@ move_of	pha;1:4~7 since move_of	;uint8_t move_of(register uint3_t a) {
 	pla;2->1		;
 	pla;1->0		;
 	inc	TOFFICE		;   TOFFICE++; //non-movedok() caller, decrement
-	lda	#0		;   return a = 0;
+	lda	#0		;   return a_= 0;
 	rts			;  } else {
 +	dex			;   x--; // convert from pile 1~4 to offset 0~3
 	lda	STACKHT+8,x	;  } // x no longer the card, but user's choice
@@ -582,7 +582,7 @@ move_of	pha;1:4~7 since move_of	;uint8_t move_of(register uint3_t a) {
 	asl			;
 	asl			;
 	asl			;   //stack#, position above top card in stack
-	ora	STACKHT+8,x	;  a = x<<4 + STACKHT[8+x];
+	ora	STACKHT+8,x	;  a_= x<<4 + STACKHT[8+x];
 	tay			;  register uint8_t y_ = a;
 	lda	STACKHT+8,x	;
 	tax			;  for (register uint8_t x_ = STACKHT[8+x]; x_;
@@ -617,7 +617,7 @@ playinv	lda	STACKHT+8,x	; } else { // trying to play investigation card
 	asl			;
 	asl			;
 	asl			;   //stack#, position in stack
-	ora	STACKHT+8,x	; a = x<<4 + STACKHT[8+x];
+	ora	STACKHT+8,x	; a_= x<<4 + STACKHT[8+x];
 	pha;2:index into ODRAWER;
 	inc	STACKHT+8,x	; STACKHT[8+x]++;
 	txa			;
@@ -630,7 +630,7 @@ playinv	lda	STACKHT+8,x	; } else { // trying to play investigation card
 	;adc	stacky+8	;
 	;sec			;
 	;sbc	#1		;
-	tay			; y = stacky[8+x] /* == 1 */ + a /* - 1 */;
+	tay			; y = stacky[8+x] /* == 1 */ + a_/* - 1 */;
 	pla;3->2		;
 	tax			;
 	lda	stackx+8,x	;
@@ -645,7 +645,7 @@ playinv	lda	STACKHT+8,x	; } else { // trying to play investigation card
 	tax			;
 	lda	TEMPVAR		;
 	sta	ODRAWER,x	; ODRAWER[a] = TEMPVAR;// and placed in drawer
-	pla;1->0		; return a = y;
+	pla;1->0		; return a; // original value passed in
 	ldx	#1		; // clear z flag to indicate succesful exit
 	rts			;} // move_of()
 
