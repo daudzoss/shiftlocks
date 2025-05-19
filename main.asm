@@ -57,7 +57,7 @@ topline	.text	"the crime scene     "
 	.text	$99,$22,$11
 	.text	"                 "
 	.null	" draw",$22
-+	.word	(+), 2055	
++	.word	(+), 2055
 	.text	$99,$22,$11
 	.text	"                 "
 	.null	" deck",$22
@@ -94,7 +94,7 @@ topline	.text	"the crime scene     "
 	.text	" f2",$c0," f4",$c0
 	.text	" f6",$c0," f8",$c0
 	.null	" to solve: ",$22
-+	.word	(+),2055	
++	.word	(+),2055
 	.text	$99,$3a,$99,$22,"pairing "
 	.text	"   +       +    "
 	.null	"   +       +",$22
@@ -209,7 +209,7 @@ abiliy	.byte	$18
 inhandx	.byte	$01,$05,$09,$0d
 inhandy	.byte	$10;,$10,$10,$10
 stackx	.byte	$00,$04,$08,$0c
-	.byte	$00,$04,$08,$0c	
+	.byte	$00,$04,$08,$0c
 	.byte	$16,$1b,$20,$25
 stacky	.byte	9,9,9,9,1,1,1,1
 	.byte	1,1,1,1		;
@@ -912,9 +912,9 @@ cardtop	lda	#$20		;   a = (x<8) ? 0xa0 /*solid*/ : 0x20 /*blank*/;
 	beq	colrto2		;
 colrtop	lda	cardclr,x	;   a = cardclr[x];
 colrto2	jsr	selfclr		;   selfclr(a, y);
-	dey			;	
+	dey			;
 	jsr	selfclr		;   selfclr(a, --y);
-	dey			;	
+	dey			;
 	jsr	selfclr		;   selfclr(a, --y);
 	;cpy	#0
 	beq	cardrts		;   if (y == 0 || y <= SCREENW) break;
@@ -1160,7 +1160,7 @@ askmsg1	.byte	$a0,$90,$92,$85	;  PRE
 	.byte	$a0,$86,$8f,$92	;  FOR
 	.byte	$a0,$99,$85,$93	;  YES
 	.byte	$a0		;
-askmsg2	
+askmsg2
 				;uint1_t animrej(void) {
 animrej	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("DISCARD & REDRAW?"/*RVS ON*/
@@ -1207,7 +1207,7 @@ rejmsg1	.byte	$a0,$90,$92,$85	;  PRE
 	.byte	$a0,$86,$8f,$92	;  FOR
 	.byte	$a0,$99,$85,$93	;  YES
 	.byte	$a0		;
-rejmsg2	
+rejmsg2
 
 
 drawone	jsr	drw1new		;void drawone(void) { int8_t a = drw1new();
@@ -1234,7 +1234,7 @@ arwdisc	sta	TEMPVAR		;void arwdisc(uint8_t& a) {
 	dey			;
 	bne	-		;
 +
-.endif	
+.endif
 -	txa			; for (uint8_t y = 0; y < 4; y++) {
 	clc			;
 	adc	nxtchar,y	;
@@ -1400,7 +1400,259 @@ inv_r2l lda	#0		;
 	jmp	sendr2l		;
 	;rts
 
-pickr2l	rts			;
+pickr2l	tax			;uint3_t pickr2l(register uint8_t a) {// a={0,1}
+	ldy	#1		; register uint6_t x = a, y;
+-	txa			; for (y = 1; y <= 4; y++) {
+	and	#$0f		;
+	cmp	STACKHT+8-1,y	;  if ((x & 0x0f) < STACKHT[y+8-1])
+	bcc	+		;   break;
+	txa			;  else
+	clc			;
+	adc	#$10		;   
+	tax			;   x += 16;
+	iny			;
+	cpy	#5		;
+	bcc	-		; }
+	inc	NWOUNDS		; if (y > 4) {
+	digitxy	NWOUNDS,WDX,WDY	;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
+	lda	#NONCARD	;
+	rts			;  return NONCARD;
++	txa			; }
+	pha			;
+	handmsg	prlmsg0,prlmsg1-prlmsg0,prlmsg2-prlmsg1,SCRATCH
+	pla			;
+	tax			;
+	and	#$30		;
+	lsr			;
+	lsr			;
+	sta	TEMPVAR		;
+	lsr			;
+	lsr			;
+	adc	TEMPVAR		; a = (stackx[1]-stackx[0]) * (x >> 4);// o. col
+	clc			;
+	adc	stackx+8	; a += stackx[0];
+	ldy	stacky+8	; y = stacky[0];
+-	clc			;
+	adc	#SCREENW	;
+	dey			;
+	bne	-		; a += SCREENW * y;
+	;clc			;
+	;adc	#<SCREENM	;
+-	sta	picksm0+1	;
+	sta	picksm1+1	;
+	sta	picksm2+1	;
+	sta	picksm3+1	;
+	sta	picksm4+1	;
+	sta	picksm5+1	;
+	sta	picksm6+1	;
+	sta	picksm7+1	;
+	lda	#>SCREENM	;
+	sta	1+picksm0+1	;
+	sta	1+picksm1+1	;
+	sta	1+picksm2+1	;
+	sta	1+picksm3+1	;
+	sta	1+picksm4+1	;
+	sta	1+picksm5+1	;
+	sta	1+picksm6+1	;
+	sta	1+picksm7+1	;
+picksm	ldy	#2		;
+	lda	#$7f		;
+picksm0	and	$0000,y		;
+picksm1	sta	$0000,y		;
+	dey			;
+	lda	#$7f		;
+picksm2	and	$0000,y		;
+picksm3	sta	$0000,y		;
+	txa			;
+	pha			;
+-	jsr	$ffe4		;
+	sta	TEMPVAR		;
+	beq	-		;
+	pla			;
+	tax			;
+	ldy	#2		;
+	lda	#$80		;
+picksm4	ora	$0000,y		;
+picksm5	sta	$0000,y		;
+	dey			;
+	lda	#$80		;
+picksm6	ora	$0000,y		;
+picksm7	sta	$0000,y		;
+	lda	TEMPVAR		;
++	cmp	#$91		;//U
+	bne	+		;
+	txa			;
+	and	#$0f		;
+	cmp	#2		;
+	bcc	-		;
+	dex			;
+	dex			; x -= 2;
+	lda	picksm0+1	;
+	sec			;
+	sbc	#2*SCREENW	;
+	sta	picksm0+1	;
+	sta	picksm1+1	;
+	sta	picksm2+1	;
+	sta	picksm3+1	;
+	sta	picksm4+1	;
+	sta	picksm5+1	;
+	sta	picksm6+1	;
+	sta	picksm7+1	;
+	lda	1+picksm0+1	;
+	sbc	#0		;
+	sta	1+picksm0+1	;
+	sta	1+picksm1+1	;
+	sta	1+picksm2+1	;
+	sta	1+picksm3+1	;
+	sta	1+picksm4+1	;
+	sta	1+picksm5+1	;
+	sta	1+picksm6+1	;
+	sta	1+picksm7+1	;
+	jmp	picksm		;
+
++	cmp	#$11		;//D
+	bne	+		;
+	txa			;
+	and	$0f		;
+	cmp	#$0e		;
+	bcs	-		;
+	inx			;
+	inx			;
+	lda	picksm0+1	;
+	clc			;
+	adc	#2*SCREENW	;
+	sta	picksm0+1	;
+	sta	picksm1+1	;
+	sta	picksm2+1	;
+	sta	picksm3+1	;
+	sta	picksm4+1	;
+	sta	picksm5+1	;
+	sta	picksm6+1	;
+	sta	picksm7+1	;
+	lda	1+picksm0+1	;
+	adc	#0		;
+	sta	1+picksm0+1	;
+	sta	1+picksm1+1	;
+	sta	1+picksm2+1	;
+	sta	1+picksm3+1	;
+	sta	1+picksm4+1	;
+	sta	1+picksm5+1	;
+	sta	1+picksm6+1	;
+	sta	1+picksm7+1	;
+	jmp	picksm		;
+
++	cmp	#$9d		;//L
+	bne	+		;
+	cpx	#$10		;
+	bcc	-		;
+	txa			;
+	sec			;
+	sbc	#$10		;
+	tax			;
+	lda	picksm0+1	;
+	sec			;
+	sbc	#5		;
+	sta	picksm0+1	;
+	sta	picksm1+1	;
+	sta	picksm2+1	;
+	sta	picksm3+1	;
+	sta	picksm4+1	;
+	sta	picksm5+1	;
+	sta	picksm6+1	;
+	sta	picksm7+1	;
+	lda	1+picksm0+1	;
+	sbc	#0		;
+	sta	1+picksm0+1	;
+	sta	1+picksm1+1	;
+	sta	1+picksm2+1	;
+	sta	1+picksm3+1	;
+	sta	1+picksm4+1	;
+	sta	1+picksm5+1	;
+	sta	1+picksm6+1	;
+	sta	1+picksm7+1	;
+	jmp	picksm		;
+
++	cmp	#$1d		;//R
+	bne	+		;
+	cpx	#$30		;
+	bcs	-		;
+	txa			;
+	clc			;
+	adc	#$10		;
+	tax			;
+	lda	picksm0+1	;
+	clc			;
+	adc	#5		;
+	sta	picksm0+1	;
+	sta	picksm1+1	;
+	sta	picksm2+1	;
+	sta	picksm3+1	;
+	sta	picksm4+1	;
+	sta	picksm5+1	;
+	sta	picksm6+1	;
+	sta	picksm7+1	;
+	lda	1+picksm0+1	;
+	adc	#0		;
+	sta	1+picksm0+1	;
+	sta	1+picksm1+1	;
+	sta	1+picksm2+1	;
+	sta	1+picksm3+1	;
+	sta	1+picksm4+1	;
+	sta	1+picksm5+1	;
+	sta	1+picksm6+1	;
+	sta	1+picksm7+1	;
+	jmp	picksm		;
+
+
++	cmp	#$0d		;//Return
+	bne	-		;
+	handmsg	prlmsg0,prlmsg1-prlmsg0,prlmsg2-prlmsg1,SCRATCH
+	lda	ODRAWER,x	;
+	pha			;
+	lda	picksm0+1	;
+	sta	picksm8+1	;
+	sta	picksm9+1	;
+	lda	1+picksm0+1	;
+	sta	1+picksm8+1	;
+	sta	1+picksm9+1	;
+	lda	#$66		;
+	ldy	#2		;
+picksm8	sta	$0000,y		;
+	dey			;
+	bne	picksm8		;
+	txa			;
+	lsr			;
+	lsr			;
+	lsr			;
+	lsr			;
+	tay			;
+	txa			;
+	and	#$0f		;
+	clc			;
+	adc	#1		;
+	cmp	STACKHT+8,y	;
+	bcc	+		;
+	lda	#$66		;
+	ldx	#4		;
+-	ldy	#2		;
+picksm9	sta	$0000,y		;
+	dey			;
+	bne	picksm9		;
+	dex			;
+	bne	-		;
++	pla			;
+	rts			;} // pickr2l()
+prlmsg0	.byte	$17,$08,$09,$03	; WHIC
+	.byte	$08,$20,$0f,$0e	; H ON
+	.byte	$05,$20,$14,$0f	; E TO
+	.byte	$20,$15,$13,$05	;  USE
+	.byte	$3f		; ?
+prlmsg1	.byte	$95,$af,$84,$af	; U/D/
+	.byte	$8c,$af,$92,$80	; L/R 
+	.byte	$8f,$92,$80,$92	; OR R
+	.byte	$85,$94,$95,$92	; ETUR
+	.byte	$8e		; N
+prlmsg2
 
 sendr2l	rts			;
 
@@ -1496,7 +1748,7 @@ b_arwup	.byte	$64,$20,$20,$20	; _
 	.byte	$20,$20,$20,$20	;
 	.byte	$20,$20,$20,$20	;
 	.byte	$4e,$65		; /[
-+	
++
 .endif
 
 +	.byte	$04,$06,(+)-*-3	; (4,6)
@@ -1607,6 +1859,6 @@ bckdrop	ldx	#bckdrop-petscii;void bckdrop(void) {
 pre_end
 .align	UNSAVED-UNDOABL
 vararea
-.align	$100	
+.align	$100
 undobuf
 .end
