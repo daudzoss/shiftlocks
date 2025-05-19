@@ -1390,9 +1390,20 @@ sendl2r	cmp	#NONCARD	;void sendl2r(register uint8_t a) {
 	digitxy	NWOUNDS,WDX,WDY	; }
 +	rts			;} // sendl2r()
 
-;;;//FIXME
-thr_r2l	rts
-inv_r2l rts
+thr_r2l	lda	#1		;
+	jsr	pickr2l		;
+	jmp	sendr2l		;
+	;rts
+
+inv_r2l lda	#0		;
+	jsr	pickr2l		;
+	jmp	sendr2l		;
+	;rts
+
+pickr2l	rts			;
+
+sendr2l	rts			;
+
 				;uint8_t warning(void) {
 warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("CANNOT PLAY THERE"/*RVS ON*/
