@@ -252,7 +252,9 @@ newhand	jsr	drw4hnd		;  do {
 	sta	TOSCENE		;  TOSCENE = TOFFICE = 2;//#cards not yet in each
 	sta	TOFFICE		;  // now play half to scene and half to office
 
-getmove	jsr	$ffe4		;  do {
+getmove	digitxy	TOSCENE,$11,0	;  do {
+	digitxy	TOFFICE,$15,0	;   digitxy(TOSCENE,*discx-1,*discy);
+	jsr	$ffe4		;   digitxy(TOFFICE,*discx+3,*discy);
 	beq	getmove		;   a = getchar();
 	cmp	#DEL_KEY	;   if (a == DEL_KEY) {
 	bne	+		;
