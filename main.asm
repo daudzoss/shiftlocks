@@ -1398,7 +1398,11 @@ inv_r2l lda	#0		;
 	jmp	sendr2l		;
 	;rts
 
-pickr2l	tax			;uint3_t pickr2l(register uint8_t a) {// a={0,1}
+.if 1
+pickr2l	pha			;
+	handmsg	prlmsg0,prlmsg1-prlmsg0,prlmsg2-prlmsg1,SCRATCH
+	pla			;
+	tax			;uint3_t pickr2l(register uint8_t a) {// a={0,1}
 	ldy	#1		; register uint6_t x = a, y;
 -	txa			; for (y = 1; y <= 4; y++) {
 	and	#$0f		;
@@ -1416,10 +1420,6 @@ pickr2l	tax			;uint3_t pickr2l(register uint8_t a) {// a={0,1}
 	lda	#NONCARD	;
 	rts			;  return NONCARD;
 +	txa			; }
-	pha			;
-	handmsg	prlmsg0,prlmsg1-prlmsg0,prlmsg2-prlmsg1,SCRATCH
-	pla			;
-	tax			;
 	and	#$30		;
 	lsr			;
 	lsr			;
@@ -1463,6 +1463,7 @@ pickr2l	tax			;uint3_t pickr2l(register uint8_t a) {// a={0,1}
 picksm	ldy	#2		;
 	lda	#$80		;
 picksm0	eor	$ffff,y		;
+pick_sm				;
 picksm1	sta	$ffff,y		;
 	dey			;
 	lda	#$80		;
@@ -1620,63 +1621,73 @@ picksm7	sta	$ffff,y		;
 	handmsg	SCRATCH,prlmsg1-prlmsg0,prlmsg2-prlmsg1
 	pla			;
 	tax			;
+.else
+pickr2l	pha			;
+	handmsg	SCRATCH,prlmsg1-prlmsg0,prlmsg2-prlmsg1
+	pla			;
+	pick_of			; uint8_t* pick_sm;
+pick_sm
+	tax			; x = pick_of(a, &pick_sm);
+.endif
 	lsr			;
 	lsr			;
 	lsr			;
 	lsr			;
-	tay			;
+	tay			; y = x >> 4;
 	txa			;
 	and	#$0f		;
 	cmp	STACKHT+8,y	;
-	bcc	+		;
- brk;	inc	NWOUNDS		;
-	digitxy	NWOUNDS,WDX,WDY	;
-	lda	#NONCARD	;
-	rts			;
+	bcc	+		; if ((x & 0x0f) >= STACKHT[y+8]) {// off stack
+ 	inc	NWOUNDS		;  NWOUNDS++; // FIXME: jump up and try again?!?
+	digitxy	NWOUNDS,WDX,WDY	;  digitxy(NWOUNDS, WDX, WDY);
+	lda	#NONCARD	;  return NONCARD;
+	rts			; }
 +	lda	ODRAWER,x	;
-	pha			;
-	lda	picksm0+1	;
+	pha			; uint8_t stack = ODRAWER[x];
+	lda	#NONCARD	;
+	sta	ODRAWER,x	; ODRAWER[x] = NONCARD;
+	lda	pick_sm-2	;
 	sta	picksm8+1	;
 	sta	picksm9+1	;
-	lda	1+picksm0+1	;
+	lda	1+pick_sm-2	;
 	sta	1+picksm8+1	;
 	sta	1+picksm9+1	;
 	lda	#$66		;
 	ldy	#2		;
-picksm8	sta	$ffff,y		;
-	dey			;
-	bpl	picksm8		;
+picksm8	sta	$ffff,y		; pick_sm[2] = 0x66; // crosshatch
+	dey			; pick_sm[1] = 0x66;
+	bpl	picksm8		; pick_sm[0] = 0x66;
 	txa			;
 	lsr			;
 	lsr			;
 	lsr			;
 	lsr			;
-	tay			;
+	tay			; y = x >> 4;
 	txa			;
 	and	#$0f		;
 	clc			;
 	adc	#1		;
 	cmp	STACKHT+8,y	;
-	bne	+		;
+	bne	+		; if ((x & 0x0f) == STACKHT[y+8]-1) { //took top
 	tya			;
 	tax			;
-	dec	STACKHT+8,x	; STACKHT[y+8]--; // reduce height only if last
-	ldx	#5		;
+	dec	STACKHT+8,x	;  STACKHT[y+8]--; // reduce height only if last
+	ldx	#5		;  for (x = 5; x > 0; x--) {
 -	ldy	#2		;
 	lda	#$66		;
-picksm9	sta	$ffff,y		;
-	dey			;
-	bpl	picksm9		;
+picksm9	sta	$ffff,y		;   pick_sm[2] = 0x66; // crosshatch
+	dey			;   pick_sm[2] = 0x66;
+	bpl	picksm9		;   pick_sm[0] = 0x66;
 	lda	picksm9+1	;
 	clc			;
 	adc	#SCREENW	;
 	sta	picksm9+1	;
 	lda	1+picksm9+1	;
 	adc	#0		;
-	sta	1+picksm9+1	;
-	dex			;
-	bne	-		;
-+	pla			;
+	sta	1+picksm9+1	;   pick_sm+ += SCREENW;
+	dex			;  }
+	bne	-		; }
++	pla			; return stack;
 	rts			;} // pickr2l()
 prlmsg0	.byte	$17,$08,$09,$03	; WHIC
 	.byte	$08,$20,$0f,$0e	; H ON
@@ -1729,6 +1740,7 @@ wrnmsg1	.byte   $90,$92,$85,$93 ; PRES
 wrnmsg2
 
 
+.if 1
 oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
 	ldx	#$15		;uint8_t oprompt(void) {
 	ldy	#$00		; do {
@@ -1763,7 +1775,44 @@ offmsg1	.byte   $90,$92,$85,$93 ; PRES
 	.byte	$81,$8e,$83,$85	; ANCE
 	.byte	$8c		; L
 offmsg2
-
+.else
+oprompt	lda	#0		;
+	pick_cs	offmsg0,offmsg1,offmsg2
+oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
+	ldx	#$15		;uint8_t oprompt(void) {
+	ldy	#$00		; do {
+	lda	#offmsg1-offmsg0;  register uint8_t a;
+	txtclip	SCRATCH		;
+	lda	#offmsg1-offmsg0;
+	replace	offmsg0		;
+-	jsr	$ffe4		; handmsg("TO WHICH PILE 1-4?"/*RVS ON*/
+	beq	-		; "PRESS 0 TO CANCEL"/*RVS OFF*/,18,17,SCRATCH);
+	pha			; a = getchar();
+	lda	#offmsg1-offmsg0;
+	replace	SCRATCH		;
+	handmsg	SCRATCH+offmsg1-offmsg0,offmsg2-offmsg1,0
+	pla			; handmsg(SCRATCH, 17, 15); // pop backing store
+	cmp	#'5'		;
+	bcc	+		;
+	jmp	oprompt		;
++	cmp	#'0'		;
+	bcs	+		;
+	jmp	oprompt		; } while (a < '0' || a > '4');
++	sec			;
+	sbc	#'0'		; return a - '0';
+	rts			;} // oprompt()
+offmsg0	.byte	$0f,$0e,$20,$14	; ON T
+	.byte	$0f,$10,$20,$0f	; OP O
+	.byte	$06,$20,$10,$09	; F PI
+	.byte	$0c,$05,$20,$31	; LE 1
+	.byte	$2d,$34,$3f	; -4?
+offmsg1	.byte   $90,$92,$85,$93 ; PRES
+	.byte   $93,$a0,$b0,$a0 ; S 0 
+	.byte   $94,$8f,$a0,$83 ; TO C
+	.byte	$81,$8e,$83,$85	; ANCE
+	.byte	$8c		; L
+offmsg2
+.endif
 	.byte	$00,$00,(+)-*-3	; (0,0)
 b_label	.byte	$14,$08,$05,$20	; THE 
 	.byte	$03,$12,$09,$0d	; CRIM 

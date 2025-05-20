@@ -168,3 +168,235 @@ pick_cs	.macro	row		;inline uint3_t pick_cs(uint8_t* row, register
 	bne	----		;   return a = x;
 	txa			; }
 	.endm			;} // pick_cs()
+
+pick_of	.macro	allowy=1	;inline uint3_t pickr2l(register uint8_t a, x) {
+	tax			; register uint6_t x = a, y;
+	ldy	#1		;
+-	txa			; for (y = 1; y <= 4; y++) {
+	and	#$0f		;
+	cmp	STACKHT+8-1,y	;  if ((x & 0x0f) < STACKHT[y+8-1])
+	bcc	+		;   break;
+	txa			;  else
+	clc			;
+	adc	#$10		;   
+	tax			;   x += 16;
+	iny			;
+	cpy	#5		;
+	bcc	-		; }
+	inc	NWOUNDS		; if (y > 4) {
+	digitxy	NWOUNDS,WDX,WDY	;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
+	lda	#NONCARD	;
+	rts			;  return NONCARD;
++	txa			; }
+	and	#$30		;
+	lsr			;
+	lsr			;
+	sta	TEMPVAR		;
+	lsr			;
+	lsr			;
+	adc	TEMPVAR		; uint10_t a_ = (stackx[1]-stackx[0]) * (x >> 4);
+	clc			;
+	adc	stackx+8	; a_ += stackx[0];
+	sta	TEMPVAR		;
+	
+	txa			;
+	ror			;
+	lda	TEMPVAR		;
+	ldy	stacky+8	; y = stacky[0];
+	bcc	+		;
+	iny			;
+-	clc			;
++	adc	#SCREENW	;
+	dey			;
+	bne	-		; a_ += SCREENW * (y + (x & 1));// inv or threat
+	;clc			;
+	;adc	#<SCREENM	;
+	sta	(+)+1		;
+	sta	(++)+1		;
+	sta	(+++)+1		;
+	sta	(++++)+1	;
+	sta	(+++++)+1	;
+	sta	(++++++)+1	;
+	sta	(+++++++)+1	;
+	sta	(++++++++)+1	;
+	lda	#>SCREENM	;
+	sta	1+(+)+1		;
+	sta	1+(++)+1	;
+	sta	1+(+++)+1	;
+	sta	1+(++++)+1	;
+	sta	1+(+++++)+1	;
+	sta	1+(++++++)+1	;
+	sta	1+(+++++++)+1	;
+	sta	1+(++++++++)+1	;
+-	ldy	#2		; do {
+	lda	#$80		;  for (y = 2; y > 0; y--)  
++
+-	eor	$ffff,y		;
++
+-	sta	$ffff,y		;
+	dey			;
+	lda	#$80		;
++
+-	eor	$ffff,y		;
++
+-	sta	$ffff,y		;   SCREENM[a_+y] ^= 0x80; // highlight symbol
+	txa			;
+	pha			;
+-	jsr	$ffe4		;
+	sta	TEMPVAR		;
+	beq	-		;  uint8_t TEMPVAR = getchar();
+	pla			;
+	tax			;
+	ldy	#2		;
+	lda	#$80		;  for (y = 2; y > 0; y--)
++
+-	eor	$ffff,y		;
++
+-	sta	$ffff,y		;
+	dey			;
+	lda	#$80		;
++
+-	eor	$ffff,y		;
++
+-	sta	$ffff,y		;   SCREENM[a_+y] ^= 0x80; // dehighlight symbol
+	lda	TEMPVAR		;
+.if \allowy
+	cmp	#$91		;
+	bne	++		;  if (TEMPVAR == 0x91) { // Up arrow
+	txa			;
+	and	#$0f		;
+	cmp	#2		;
+	bcs	+		;   if (x & 0x0f < 2)
+	jmp	----------	;    continue; // already up as far as we can go
++	dex			;
+	dex			;   x -= 2;
+	lda	(---------)+1	;
+	sec			;
+	sbc	#2*SCREENW	;
+	sta	(---------)+1	;
+	sta	(--------)+1	;
+	sta	(-------)+1	;
+	sta	(------)+1	;
+	sta	(----)+1	;
+	sta	(---)+1		;
+	sta	(--)+1		;
+	sta	(-)+1		;
+	lda	1+(---------)+1	;
+	sbc	#0		;
+	sta	1+(---------)+1	;
+	sta	1+(--------)+1	;
+	sta	1+(-------)+1	;
+	sta	1+(------)+1	;
+	sta	1+(----)+1	;
+	sta	1+(---)+1	;
+	sta	1+(--)+1	;
+	sta	1+(-)+1		;   a_ -= 2 * SCREENW;
+	jmp	----------	;
+
++	cmp	#$11		;
+	bne	++		;  } else if (TEMPVAR == 0x11) { // Down arrow
+	txa			;
+	and	#$0f		;
+	cmp	#$0e		;
+	bcc	+		;   if (x & 0x0f >= 14)
+	jmp	----------	;    continue;//already down as far as we can go
++	inx			;
+	inx			;   x += 2;
+	lda	(---------)+1	;
+	clc			;
+	adc	#2*SCREENW	;
+	sta	(---------)+1	;
+	sta	(--------)+1	;
+	sta	(-------)+1	;
+	sta	(------)+1	;
+	sta	(----)+1	;
+	sta	(---)+1		;
+	sta	(--)+1		;
+	sta	(-)+1		;
+	lda	1+(---------)+1	;
+	adc	#0		;
+	sta	1+(---------)+1	;
+	sta	1+(--------)+1	;
+	sta	1+(-------)+1	;
+	sta	1+(------)+1	;
+	sta	1+(----)+1	;
+	sta	1+(---)+1	;
+	sta	1+(--)+1	;
+	sta	1+(-)+1		;   a_ += 2 * SCREENW;
+	jmp	----------	;
+.endif
++	cmp	#$9d		;
+	bne	++		;  } else if (TEMPVAR == 0x9d) { // Left arrow
+	cpx	#$10		;
+	bcs	+		;   if (x < 16)
+	jmp	----------	;    continue;//already left as far as we can go
++	txa			;
+	sec			;
+	sbc	#$10		;
+	tax			;   x -= 0x10;
+	lda	(---------)+1	;
+	sec			;
+	sbc	#5		;
+	sta	(---------)+1	;
+	sta	(--------)+1	;
+	sta	(-------)+1	;
+	sta	(------)+1	;
+	sta	(----)+1	;
+	sta	(---)+1		;
+	sta	(--)+1		;
+	sta	(-)+1		;
+	lda	1+(---------)+1	;
+	sbc	#0		;
+	sta	1+(---------)+1	;
+	sta	1+(--------)+1	;
+	sta	1+(-------)+1	;
+	sta	1+(------)+1	;
+	sta	1+(----)+1	;
+	sta	1+(---)+1	;
+	sta	1+(--)+1	;
+	sta	1+(-)+1		;   a_ -= stackx[9] - stackx[8]; // 5
+	jmp	----------	;
+
++	cmp	#$1d		;
+	bne	++		;  } else if (TEMPVAR == 0x1d) { // Right arrow
+	cpx	#$30		;
+	bcc	+		;   if (x >= 48)
+	jmp	----------	;    continue;//already right as far as we can
++	txa			;
+	clc			;
+	adc	#$10		;   x += 10;
+	tax			;
+	lda	(---------)+1	;
+	clc			;
+	adc	#5		;
+	sta	(---------)+1	;
+	sta	(--------)+1	;
+	sta	(-------)+1	;
+	sta	(------)+1	;
+	sta	(----)+1	;
+	sta	(---)+1		;
+	sta	(--)+1		;
+	sta	(-)+1		;
+	lda	1+(---------)+1	;
+	adc	#0		;
+	sta	1+(---------)+1	;
+	sta	1+(--------)+1	;
+	sta	1+(-------)+1	;
+	sta	1+(------)+1	;
+	sta	1+(----)+1	;
+	sta	1+(---)+1	;
+	sta	1+(--)+1	;
+	sta	1+(-)+1		;   a_ += stackx[9] - stackx[8]; // 5
+	jmp	----------	;
+
++	cmp	#$0d		;
+	beq	+		; } while (TEMPVAR != 0x0d); // at last, Return
+	jmp	----------	;} // pick_cs()
++	lda	(---------)+1	;
+	sta	(+)-2		;
+	lda	1+(---------)+1	;
+	sta	(+)-1		;
+	jmp	+		;
+	bit	$ffff		;
++
+	.endm
