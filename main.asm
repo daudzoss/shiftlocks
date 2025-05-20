@@ -1398,7 +1398,7 @@ inv_r2l lda	#0		;
 	jmp	sendr2l		;
 	;rts
 
-.if 1
+.if 0
 pickr2l	pha			;
 	handmsg	prlmsg0,prlmsg1-prlmsg0,prlmsg2-prlmsg1,SCRATCH
 	pla			;
@@ -1623,10 +1623,13 @@ picksm7	sta	$ffff,y		;
 	tax			;
 .else
 pickr2l	pha			;
-	handmsg	SCRATCH,prlmsg1-prlmsg0,prlmsg2-prlmsg1
+	handmsg	prlmsg0,prlmsg1-prlmsg0,prlmsg2-prlmsg1,SCRATCH
 	pla			;
 	pick_of			; uint8_t* pick_sm;
 pick_sm
+	pha			;
+	handmsg	SCRATCH,prlmsg1-prlmsg0,prlmsg2-prlmsg1
+	pla			;
 	tax			; x = pick_of(a, &pick_sm);
 .endif
 	lsr			;

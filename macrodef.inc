@@ -396,6 +396,7 @@ pick_of	.macro	allowy=1	;inline uint3_t pickr2l(register uint8_t a, x) {
 	sta	(+)-2		;
 	lda	1+(---------)+1	;
 	sta	(+)-1		;
+	txa			;
 	jmp	+		;
 	bit	$ffff		;
 +
