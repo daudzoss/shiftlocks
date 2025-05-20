@@ -1743,7 +1743,18 @@ wrnmsg1	.byte   $90,$92,$85,$93 ; PRES
 wrnmsg2
 
 
-.if 1
+.if 0
+offmsg0	.byte	$0f,$0e,$20,$14	; ON T
+	.byte	$0f,$10,$20,$0f	; OP O
+	.byte	$06,$20,$10,$09	; F PI
+	.byte	$0c,$05,$20,$31	; LE 1
+	.byte	$2d,$34,$3f	; -4?
+offmsg1	.byte   $90,$92,$85,$93 ; PRES
+	.byte   $93,$a0,$b0,$a0 ; S 0 
+	.byte   $94,$8f,$a0,$83 ; TO C
+	.byte	$81,$8e,$83,$85	; ANCE
+	.byte	$8c		; L
+Offmsg2
 oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
 	ldx	#$15		;uint8_t oprompt(void) {
 	ldy	#$00		; do {
@@ -1758,43 +1769,40 @@ oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
 	replace	SCRATCH		;
 	handmsg	SCRATCH+offmsg1-offmsg0,offmsg2-offmsg1,0
 	pla			; handmsg(SCRATCH, 17, 15); // pop backing store
-	cmp	#'5'		;
-	bcc	+		;
-	jmp	oprompt		;
-+	cmp	#'0'		;
-	bcs	+		;
-	jmp	oprompt		; } while (a < '0' || a > '4');
-+	sec			;
-	sbc	#'0'		; return a - '0';
-	rts			;} // oprompt()
 offmsg0	.byte	$0f,$0e,$20,$14	; ON T
 	.byte	$0f,$10,$20,$0f	; OP O
 	.byte	$06,$20,$10,$09	; F PI
-	.byte	$0c,$05,$20,$31	; LE 1
-	.byte	$2d,$34,$3f	; -4?
-offmsg1	.byte   $90,$92,$85,$93 ; PRES
-	.byte   $93,$a0,$b0,$a0 ; S 0 
-	.byte   $94,$8f,$a0,$83 ; TO C
-	.byte	$81,$8e,$83,$85	; ANCE
-	.byte	$8c		; L
-offmsg2
+	.byte	$0c,$05,$3f	; LE?
 .else
-oprompt	lda	#0		;
-	pick_cs	offmsg0,offmsg1,offmsg2
+offmsg0	.byte	$20		;
+	.byte	$0f,$0e,$14,$0f	; ONTO
+	.byte	$20,$17,$08,$09	;  WHI
+	.byte	$03,$08,$20,$10	; CH P
+	.byte	$09,$0c,$05,$3f	; ILE?
+	.byte	$20		;
+offmsg1
+Offmsg2
 oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
-	ldx	#$15		;uint8_t oprompt(void) {
+	ldx	#$16		;uint8_t oprompt(void) {
 	ldy	#$00		; do {
 	lda	#offmsg1-offmsg0;  register uint8_t a;
 	txtclip	SCRATCH		;
 	lda	#offmsg1-offmsg0;
 	replace	offmsg0		;
--	jsr	$ffe4		; handmsg("TO WHICH PILE 1-4?"/*RVS ON*/
-	beq	-		; "PRESS 0 TO CANCEL"/*RVS OFF*/,18,17,SCRATCH);
-	pha			; a = getchar();
+	lda	#0		;
+	pick_of	0;only L/R keys	;
+	txa			;
+	pha			;
 	lda	#offmsg1-offmsg0;
 	replace	SCRATCH		;
 	handmsg	SCRATCH+offmsg1-offmsg0,offmsg2-offmsg1,0
 	pla			; handmsg(SCRATCH, 17, 15); // pop backing store
+	lsr			;
+	lsr			; // FIXME: also dehighlight last-picked card?
+	lsr			;
+	lsr			;
+	adc	#'1'		;
+.endif
 	cmp	#'5'		;
 	bcc	+		;
 	jmp	oprompt		;
@@ -1804,18 +1812,7 @@ oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
 +	sec			;
 	sbc	#'0'		; return a - '0';
 	rts			;} // oprompt()
-offmsg0	.byte	$0f,$0e,$20,$14	; ON T
-	.byte	$0f,$10,$20,$0f	; OP O
-	.byte	$06,$20,$10,$09	; F PI
-	.byte	$0c,$05,$20,$31	; LE 1
-	.byte	$2d,$34,$3f	; -4?
-offmsg1	.byte   $90,$92,$85,$93 ; PRES
-	.byte   $93,$a0,$b0,$a0 ; S 0 
-	.byte   $94,$8f,$a0,$83 ; TO C
-	.byte	$81,$8e,$83,$85	; ANCE
-	.byte	$8c		; L
-offmsg2
-.endif
+	
 	.byte	$00,$00,(+)-*-3	; (0,0)
 b_label	.byte	$14,$08,$05,$20	; THE 
 	.byte	$03,$12,$09,$0d	; CRIM 
