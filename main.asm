@@ -1377,7 +1377,7 @@ plrmsg1	.byte	$8c,$af,$92,$a0	; L/R
 plrmsg2
 
 sendl2r	cmp	#NONCARD	;void sendl2r(register uint8_t a) {
-	beq	+		; if (a == NONCARD) return; // FIXME: no wound?
+	beq	+		; if (a == NONCARD) return;// wound in pickl2r()
 	jsr	intohnd		; a = intohnd(a);// momentary hand slot 1 ~ 4
 	sec			; // 1,2,3,4
 	sbc	#1		; a--; // 0,1,2,3
@@ -1431,6 +1431,11 @@ pickr2l	tax			;uint3_t pickr2l(register uint8_t a) {// a={0,1}
 	adc	TEMPVAR		; a = (stackx[1]-stackx[0]) * (x >> 4);// o. col
 	clc			;
 	adc	stackx+8	; a += stackx[0];
+	sta	TEMPVAR		;
+	txa			;
+	and	#$01		;
+	clc			;
+	adc	TEMPVAR		;
 	ldy	stacky+8	; y = stacky[0];
 -	clc			;
 	adc	#SCREENW	;
@@ -1610,8 +1615,22 @@ picksm7	sta	$0000,y		;
 +	cmp	#$0d		;//Return
 	beq	+		;
 	jmp	--		;
-+	handmsg	prlmsg0,prlmsg1-prlmsg0,prlmsg2-prlmsg1,SCRATCH
-	lda	ODRAWER,x	;
++	handmsg	SCRATCH,prlmsg1-prlmsg0,prlmsg2-prlmsg1
+	txa			;
+	lsr			;
+	lsr			;
+	lsr			;
+	lsr			;
+	tay			;
+	txa			;
+	and	#$0f		;
+	cmp	STACKHT+8,y	;
+	bcc	+		;
+	inc	NWOUNDS		;
+	digitxy	NWOUNDS,WDX,WDY	;
+	lda	#NONCARD	;
+	rts			;
++	lda	ODRAWER,x	;
 	pha			;
 	lda	picksm0+1	;
 	sta	picksm8+1	;
@@ -1623,7 +1642,7 @@ picksm7	sta	$0000,y		;
 	ldy	#2		;
 picksm8	sta	$0000,y		;
 	dey			;
-	bne	picksm8		;
+	bpl	picksm8		;
 	txa			;
 	lsr			;
 	lsr			;
@@ -1635,13 +1654,13 @@ picksm8	sta	$0000,y		;
 	clc			;
 	adc	#1		;
 	cmp	STACKHT+8,y	;
-	bcc	+		;
+	bne	+		;
 	lda	#$66		;
 	ldx	#4		;
 -	ldy	#2		;
 picksm9	sta	$0000,y		;
 	dey			;
-	bne	picksm9		;
+	bpl	picksm9		;
 	dex			;
 	bne	-		;
 +	pla			;
@@ -1658,7 +1677,17 @@ prlmsg1	.byte	$95,$af,$84,$af	; U/D/
 	.byte	$8e		; N
 prlmsg2
 
-sendr2l	rts			;
+sendr2l	cmp	#NONCARD	;void sendr2l(register uint8_t a) {
+	beq	+		; if (a == NONCARD) return;// wound in pickr2l()
+	jsr	intohnd		; a = intohnd(a);// momentary hand slot 1 ~ 4
+	sec			; // 1,2,3,4
+	sbc	#1		; a--; // 0,1,2,3
+	jsr	move_cs		; // spoof hand play to scene
+	bne	+		; if (move_cs(a) == 0) {//FIXME?: -1 not checked
+	dec	TOSCENE		;  TOSCENE--; // undo spurious inc by move_of()
+	inc	NWOUNDS		;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
+	digitxy	NWOUNDS,WDX,WDY	; }
++	rts			;} // sendl2r()
 
 				;uint8_t warning(void) {
 warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
