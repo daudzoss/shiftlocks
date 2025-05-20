@@ -1432,18 +1432,20 @@ pickr2l	tax			;uint3_t pickr2l(register uint8_t a) {// a={0,1}
 	clc			;
 	adc	stackx+8	; a += stackx[0];
 	sta	TEMPVAR		;
+	
 	txa			;
-	and	#$01		;
-	clc			;
-	adc	TEMPVAR		;
+	ror			;
+	lda	TEMPVAR		;
 	ldy	stacky+8	; y = stacky[0];
+	bcc	+		;
+	iny			;
 -	clc			;
-	adc	#SCREENW	;
++	adc	#SCREENW	;
 	dey			;
-	bne	-		; a += SCREENW * y;
+	bne	-		; a += SCREENW * (y + (x & 1));
 	;clc			;
 	;adc	#<SCREENM	;
--	sta	picksm0+1	;
+	sta	picksm0+1	;
 	sta	picksm1+1	;
 	sta	picksm2+1	;
 	sta	picksm3+1	;
@@ -1462,13 +1464,13 @@ pickr2l	tax			;uint3_t pickr2l(register uint8_t a) {// a={0,1}
 	sta	1+picksm7+1	;
 picksm	ldy	#2		;
 	lda	#$80		;
-picksm0	eor	$0000,y		;
-picksm1	sta	$0000,y		;
+picksm0	eor	$ffff,y		;
+picksm1	sta	$ffff,y		;
 	dey			;
 	lda	#$80		;
-picksm2	eor	$0000,y		;
-picksm3	sta	$0000,y		;
--	txa			;
+picksm2	eor	$ffff,y		;
+picksm3	sta	$ffff,y		;
+	txa			;
 	pha			;
 -	jsr	$ffe4		;
 	sta	TEMPVAR		;
@@ -1477,14 +1479,14 @@ picksm3	sta	$0000,y		;
 	tax			;
 	ldy	#2		;
 	lda	#$80		;
-picksm4	eor	$0000,y		;
-picksm5	sta	$0000,y		;
+picksm4	eor	$ffff,y		;
+picksm5	sta	$ffff,y		;
 	dey			;
 	lda	#$80		;
-picksm6	eor	$0000,y		;
-picksm7	sta	$0000,y		;
+picksm6	eor	$ffff,y		;
+picksm7	sta	$ffff,y		;
 	lda	TEMPVAR		;
-+	cmp	#$91		;//U
+	cmp	#$91		;//U
 	bne	++		;
 	txa			;
 	and	#$0f		;
@@ -1614,9 +1616,12 @@ picksm7	sta	$0000,y		;
 
 +	cmp	#$0d		;//Return
 	beq	+		;
-	jmp	--		;
-+	handmsg	SCRATCH,prlmsg1-prlmsg0,prlmsg2-prlmsg1
-	txa			;
+	jmp	picksm		;
++	txa			;
+	pha			;
+	handmsg	SCRATCH,prlmsg1-prlmsg0,prlmsg2-prlmsg1
+	pla			;
+	tax			;
 	lsr			;
 	lsr			;
 	lsr			;
@@ -1626,7 +1631,7 @@ picksm7	sta	$0000,y		;
 	and	#$0f		;
 	cmp	STACKHT+8,y	;
 	bcc	+		;
-	inc	NWOUNDS		;
+ brk;	inc	NWOUNDS		;
 	digitxy	NWOUNDS,WDX,WDY	;
 	lda	#NONCARD	;
 	rts			;
@@ -1640,7 +1645,7 @@ picksm7	sta	$0000,y		;
 	sta	1+picksm9+1	;
 	lda	#$66		;
 	ldy	#2		;
-picksm8	sta	$0000,y		;
+picksm8	sta	$ffff,y		;
 	dey			;
 	bpl	picksm8		;
 	txa			;
@@ -1658,9 +1663,16 @@ picksm8	sta	$0000,y		;
 	lda	#$66		;
 	ldx	#4		;
 -	ldy	#2		;
-picksm9	sta	$0000,y		;
+picksm9	sta	$ffff,y		;
 	dey			;
 	bpl	picksm9		;
+	lda	picksm9+1	;
+	clc			;
+	adc	#SCREENW	;
+	sta	picksm9+1	;
+	lda	1+picksm9+1	;
+	adc	#0		;
+	sta	1+picksm9+1	;
 	dex			;
 	bne	-		;
 +	pla			;
@@ -1682,7 +1694,9 @@ sendr2l	cmp	#NONCARD	;void sendr2l(register uint8_t a) {
 	jsr	intohnd		; a = intohnd(a);// momentary hand slot 1 ~ 4
 	sec			; // 1,2,3,4
 	sbc	#1		; a--; // 0,1,2,3
-	jsr	move_cs		; // spoof hand play to scene
+	lsr			; a = (a << 1); // spoof hand play to scene
+ brk
+	jsr	move_cs		; // 0, 2, 4, 6
 	bne	+		; if (move_cs(a) == 0) {//FIXME?: -1 not checked
 	dec	TOSCENE		;  TOSCENE--; // undo spurious inc by move_of()
 	inc	NWOUNDS		;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
