@@ -226,7 +226,9 @@ main
 	sta	DISCREM		;
 	sta	HANDREM		;
 	sta	NWOUNDS		; NWOUNDS = DISCREM = HANDREM = 0;
+.if BASIC
 	jsr	bckdrop		; bckdrop(); // draw most of the scren
+.endif
 	jsr	finishr		; finishr(); // rule/ability text and card color
 	digitxy	NWOUNDS,WDX,WDY	; digitxy(NWOUNDS, WDX, WDY); // set wounds to 0
 	jsr	discsho		; discsho(); // show the empty discard pile
@@ -1754,7 +1756,7 @@ offmsg1	.byte   $90,$92,$85,$93 ; PRES
 	.byte   $94,$8f,$a0,$83 ; TO C
 	.byte	$81,$8e,$83,$85	; ANCE
 	.byte	$8c		; L
-Offmsg2
+offmsg2
 oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
 	ldx	#$15		;uint8_t oprompt(void) {
 	ldy	#$00		; do {
@@ -1781,7 +1783,7 @@ offmsg0	.byte	$20		;
 	.byte	$09,$0c,$05,$3f	; ILE?
 	.byte	$20		;
 offmsg1
-Offmsg2
+offmsg2
 oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
 	ldx	#$16		;uint8_t oprompt(void) {
 	ldy	#$00		; do {
@@ -1812,7 +1814,8 @@ oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
 +	sec			;
 	sbc	#'0'		; return a - '0';
 	rts			;} // oprompt()
-	
+
+.if BASIC
 	.byte	$00,$00,(+)-*-3	; (0,0)
 b_label	.byte	$14,$08,$05,$20	; THE 
 	.byte	$03,$12,$09,$0d	; CRIM 
@@ -1934,7 +1937,6 @@ bckdrop	ldx	#bckdrop-petscii;void bckdrop(void) {
 	jsr	$ffd2		;
 	dex			;
 	bne	-		; printf("%c%c%c%c%c%c", 9, 147, 8, 19, 19);
-.if BASIC
 	ldy	#SCREENH	; for (register uint8_t y = SCREENH; y > 0; y--)
 -	ldx	#SCREENW	;  for (register uint8_t x = SCREENH; x > 0; x--)
 -	lda	#$20		;
@@ -1950,8 +1952,9 @@ bckdrop	ldx	#bckdrop-petscii;void bckdrop(void) {
 	 lda	s-1		; for (i = 0; i < SLEN; i++)
 	printxy	s		;  printxy(s[i], x=s[i]-1, y=s[i]-2, a=s[i]-3);
 	.next
+	rts			;} // bckdrop()
 .endif
-	rts			;}
+
 pre_end
 .align	UNSAVED-UNDOABL
 vararea
