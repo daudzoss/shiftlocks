@@ -1658,9 +1658,10 @@ picksm8	sta	$ffff,y		;
 	adc	#1		;
 	cmp	STACKHT+8,y	;
 	bne	+		;
-	lda	#$66		;
-	ldx	#4		;
+	dec	STACKHT+8,y	; STACKHT[y+8]--; // reduce height only if last
+	ldx	#5		;
 -	ldy	#2		;
+	lda	#$66		;
 picksm9	sta	$ffff,y		;
 	dey			;
 	bpl	picksm9		;
