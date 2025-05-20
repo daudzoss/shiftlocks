@@ -1943,13 +1943,14 @@ bckdrop	ldx	#bckdrop-petscii;void bckdrop(void) {
 	bne	-		;
 	dey			;
 	bne	--		;
-.endif
+
 	.for s in b_label,b_arwup,b_threa,b_wound,b_inves,b_dpile,b_draw,b_deck,b_fodds,b_arwdn,b_feven,b_pairg
 	 ldx	s-3		; 
 	 ldy	s-2		;
 	 lda	s-1		; for (i = 0; i < SLEN; i++)
 	printxy	s		;  printxy(s[i], x=s[i]-1, y=s[i]-2, a=s[i]-3);
 	.next
+.endif
 	rts			;}
 pre_end
 .align	UNSAVED-UNDOABL
