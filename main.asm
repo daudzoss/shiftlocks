@@ -1456,14 +1456,14 @@ pickr2l	tax			;uint3_t pickr2l(register uint8_t a) {// a={0,1}
 	sta	1+picksm6+1	;
 	sta	1+picksm7+1	;
 picksm	ldy	#2		;
-	lda	#$7f		;
-picksm0	and	$0000,y		;
+	lda	#$80		;
+picksm0	eor	$0000,y		;
 picksm1	sta	$0000,y		;
 	dey			;
-	lda	#$7f		;
-picksm2	and	$0000,y		;
+	lda	#$80		;
+picksm2	eor	$0000,y		;
 picksm3	sta	$0000,y		;
-	txa			;
+-	txa			;
 	pha			;
 -	jsr	$ffe4		;
 	sta	TEMPVAR		;
@@ -1472,20 +1472,21 @@ picksm3	sta	$0000,y		;
 	tax			;
 	ldy	#2		;
 	lda	#$80		;
-picksm4	ora	$0000,y		;
+picksm4	eor	$0000,y		;
 picksm5	sta	$0000,y		;
 	dey			;
 	lda	#$80		;
-picksm6	ora	$0000,y		;
+picksm6	eor	$0000,y		;
 picksm7	sta	$0000,y		;
 	lda	TEMPVAR		;
 +	cmp	#$91		;//U
-	bne	+		;
+	bne	++		;
 	txa			;
 	and	#$0f		;
 	cmp	#2		;
-	bcc	-		;
-	dex			;
+	bcs	+		;
+	jmp	picksm		;
++	dex			;
 	dex			; x -= 2;
 	lda	picksm0+1	;
 	sec			;
@@ -1511,12 +1512,13 @@ picksm7	sta	$0000,y		;
 	jmp	picksm		;
 
 +	cmp	#$11		;//D
-	bne	+		;
+	bne	++		;
 	txa			;
-	and	$0f		;
+	and	#$0f		;
 	cmp	#$0e		;
-	bcs	-		;
-	inx			;
+	bcc	+		;
+	jmp	picksm		;
++	inx			;
 	inx			;
 	lda	picksm0+1	;
 	clc			;
@@ -1542,10 +1544,11 @@ picksm7	sta	$0000,y		;
 	jmp	picksm		;
 
 +	cmp	#$9d		;//L
-	bne	+		;
+	bne	++		;
 	cpx	#$10		;
-	bcc	-		;
-	txa			;
+	bcs	+		;
+	jmp	picksm		;
++	txa			;
 	sec			;
 	sbc	#$10		;
 	tax			;
@@ -1573,10 +1576,11 @@ picksm7	sta	$0000,y		;
 	jmp	picksm		;
 
 +	cmp	#$1d		;//R
-	bne	+		;
+	bne	++		;
 	cpx	#$30		;
-	bcs	-		;
-	txa			;
+	bcc	+		;
+	jmp	picksm		;
++	txa			;
 	clc			;
 	adc	#$10		;
 	tax			;
@@ -1603,10 +1607,10 @@ picksm7	sta	$0000,y		;
 	sta	1+picksm7+1	;
 	jmp	picksm		;
 
-
 +	cmp	#$0d		;//Return
-	bne	-		;
-	handmsg	prlmsg0,prlmsg1-prlmsg0,prlmsg2-prlmsg1,SCRATCH
+	beq	+		;
+	jmp	--		;
++	handmsg	prlmsg0,prlmsg1-prlmsg0,prlmsg2-prlmsg1,SCRATCH
 	lda	ODRAWER,x	;
 	pha			;
 	lda	picksm0+1	;
@@ -1648,8 +1652,8 @@ prlmsg0	.byte	$17,$08,$09,$03	; WHIC
 	.byte	$20,$15,$13,$05	;  USE
 	.byte	$3f		; ?
 prlmsg1	.byte	$95,$af,$84,$af	; U/D/
-	.byte	$8c,$af,$92,$80	; L/R 
-	.byte	$8f,$92,$80,$92	; OR R
+	.byte	$8c,$af,$92,$a0	; L/R 
+	.byte	$8f,$92,$a0,$92	; OR R
 	.byte	$85,$94,$95,$92	; ETUR
 	.byte	$8e		; N
 prlmsg2
