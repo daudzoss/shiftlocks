@@ -1379,11 +1379,9 @@ plrmsg2
 sendl2r	cmp	#NONCARD	;void sendl2r(register uint8_t a) {
 	beq	+		; if (a == NONCARD) return;// wound in pickl2r()
 	jsr	intohnd		; a = intohnd(a);// momentary hand slot 1 ~ 4
-	sec			; // 1,2,3,4
-	sbc	#1		; a--; // 0,1,2,3
-	;sec			;
-	rol			; a = (a << 1) | 1; // spoof hand play to office
-	jsr	move_of		; // 1,3,5,7
+	clc			; // 1,2,3,4
+	adc	#3		; a += 3; // 4,5,6,7 i.e. moving to office
+	jsr	move_of		; // spoof playing that card from hand to office
 	bne	+		; if (move_of(a) == 0) {//FIXME?: -1 not checked
 	dec	TOFFICE		;  TOFFICE--; // undo spurious inc by move_of()
 	inc	NWOUNDS		;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
@@ -1694,9 +1692,7 @@ sendr2l	cmp	#NONCARD	;void sendr2l(register uint8_t a) {
 	jsr	intohnd		; a = intohnd(a);// momentary hand slot 1 ~ 4
 	sec			; // 1,2,3,4
 	sbc	#1		; a--; // 0,1,2,3
-	lsr			; a = (a << 1); // spoof hand play to scene
- brk
-	jsr	move_cs		; // 0, 2, 4, 6
+	jsr	move_cs		; // spoof playing that card from hand to c'scene
 	bne	+		; if (move_cs(a) == 0) {//FIXME?: -1 not checked
 	dec	TOSCENE		;  TOSCENE--; // undo spurious inc by move_of()
 	inc	NWOUNDS		;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
