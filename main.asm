@@ -150,7 +150,7 @@ ACURSOR	= UNSAVED + $08
 TEMPVAR	= UNSAVED + $09
 SCRATCH	= UNSAVED + $0a		; must be last
 
-snapsht	rts
+snpshot	rts
 
 undomov	rts
 
@@ -241,7 +241,7 @@ newhand	jsr	drw4hnd		;  do {
 	bne	+		;   if (HANDFOM == 0)
 	brk			;    exit(1); // more than 44 cards in stacks?!?
 	.byte	$1		;
-+	jsr	snapsht		;   snapshot();
++	jsr	snpshot		;   snpshot();
 	jsr	animhnd		;   animhnd();// draw empty deck pile after if 0
 	jsr	discsho		;   discsho();// ,empty discard pile if shuffled
 	lda	HANDFOM		;
@@ -418,7 +418,7 @@ wndleft	digitxy	NWOUNDS,WDX,WDY	;   }
 .else
 	jsr	animhnd		;   animhnd(); // show the played slot as blank
 .endif
-	jsr	snapsht		;   snapsht();
+	jsr	snpshot		;   snpshot();
 	lda	HANDREM		;
 	beq	+		;
 	jmp	getmove		;  } while (HANDREM);
@@ -1726,7 +1726,7 @@ sendr2l	cmp	#NONCARD	;void sendr2l(register uint8_t a) {
 	jsr	intohnd		; a = intohnd(a);// momentary hand slot 1 ~ 4
 	sec			; // 1,2,3,4
 	sbc	#1		; a--; // 0,1,2,3
-	jsr	move_cs		; // spoof playing that card from hand to c'scene
+	jsr	move_cs		; // spoof playing that card from hand to cscene
 	bne	+		; if (move_cs(a) == 0) {//FIXME?: -1 not checked
 	dec	TOSCENE		;  TOSCENE--; // undo spurious inc by move_of()
 	inc	NWOUNDS		;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
@@ -1736,7 +1736,7 @@ sendr2l	cmp	#NONCARD	;void sendr2l(register uint8_t a) {
 				;uint8_t warning(void) {
 warning	handmsg	wrnmsg0,wrnmsg1-wrnmsg0,wrnmsg2-wrnmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("CANNOT PLAY THERE"/*RVS ON*/
-	beq	-		;         "PRESS Y FOR WOUND"/*RVS OFF*/, 17, 17,
+	beq	-		;         "PRESS Y FOR WOUND"/*RVS OFF*/,17,17,
 	and	#$df		;         SCRATCH);
 	cmp	#$59		; register uint8_t a = getchar();
 	php			; handmsg(SCRATCH, 17, 17); // pop backing store
