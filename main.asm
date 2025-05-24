@@ -425,7 +425,22 @@ wndleft	digitxy	NWOUNDS,WDX,WDY	;   }
 +	jsr	gamewon		;
 	bne	mainend		;
 	jmp	newhand		; } while (!gamewon());
-mainend	rts			;} // main()
+mainend	handmsg	wonmsg0,wonmsg1-wonmsg0,wonmsg2-wonmsg1,SCRATCH
+-	jsr	$ffe4		; do {
+	beq 	-		; } while (getchar());
+	handmsg	SCRATCH,wonmsg1-wonmsg0,wonmsg2-wonmsg1
+	rts			;} // main()
+wonmsg0	.byte	$19,$0f,$15,$20	; YOU
+	.byte	$17,$0f,$0e,$20	; WON
+	.byte	$14,$08,$05,$20	; THE
+	.byte	$07,$01,$0d,$05	; GAME
+	.byte	$21		; !
+wonmsg1	.byte	$a0,$81,$8e,$99	;  ANY
+	.byte	$a0,$8b,$85,$99	;  KEY
+	.byte	$a0,$94,$8f,$a0	;  TO
+	.byte	$85,$98,$89,$94	; EXIT
+	.byte	$a0		;
+wonmsg2
 
 ARROWOD	= SCREENM+SCREENW*$0f+1-2
 ARROWEV	= ARROWOD+6*SCREENW
@@ -1945,6 +1960,8 @@ bckdrop	ldx	#bckdrop-petscii;void bckdrop(void) {
 	bne	-		;
 	dey			;
 	bne	--		;
+	lda	#$13		;
+	jsr	$ffd2		; printf("%c", 19); // back to home corner
 
 	.for s in b_label,b_arwup,b_threa,b_wound,b_inves,b_dpile,b_draw,b_deck,b_fodds,b_arwdn,b_feven,b_pairg
 	 ldx	s-3		; 
