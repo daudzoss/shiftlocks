@@ -405,7 +405,7 @@ wndleft	digitxy	NWOUNDS,WDX,WDY	;   }
 	lda	NWOUNDS		;   digitxy(NWOUNDS, WDX, WDY);
 	cmp	#$03		;
 	bcc	+		;   if (NWOUNDS >= 3)
-	bcs	mainend		;    exit(0);
+	jmp	youlost		;    exit(0);
 +
 .if 0
 	and	#$03		;
@@ -429,7 +429,7 @@ mainend	handmsg	wonmsg0,wonmsg1-wonmsg0,wonmsg2-wonmsg1,SCRATCH
 -	jsr	$ffe4		; do {
 	beq 	-		; } while (getchar());
 	handmsg	SCRATCH,wonmsg1-wonmsg0,wonmsg2-wonmsg1
-	rts			;} // main()
+youlost	rts			;} // main()
 wonmsg0	.byte	$19,$0f,$15,$20	; YOU
 	.byte	$17,$0f,$0e,$20	; WON
 	.byte	$14,$08,$05,$20	; THE
