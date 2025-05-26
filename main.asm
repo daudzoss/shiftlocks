@@ -406,18 +406,7 @@ wndleft	digitxy	NWOUNDS,WDX,WDY	;   }
 	cmp	#$03		;
 	bcc	+		;   if (NWOUNDS >= 3)
 	jmp	youlost		;    exit(0);
-+
-.if 0
-	and	#$03		;
-	tay			;
-	ldx	inhandx,y	;
-	ldy	inhandy		;
-	clc			;
-	lda	#NONCARD	;
-	jsr	cardsho		;
-.else
-	jsr	animhnd		;   animhnd(); // show the played slot as blank
-.endif
++	jsr	animhnd		;   animhnd(); // show the played slot as blank
 	jsr	snpshot		;   snpshot();
 	lda	HANDREM		;
 	beq	+		;
@@ -716,7 +705,7 @@ move_cs	pha;1:0~3 since move_cs	;uint8_t move_cs(register uint3_t a) {
 	inc	NWOUNDS		;   NWOUNDS++;
 	digitxy	NWOUNDS,WDX,WDY	;   digitxy(NWOUNDS, WDX, WDY);
 	jmp	++		;  } else // may re-call movedok() re-entrant
-+	jsr	invest2		;   invest2(a); } } //defined in playeras.asm
++	jsr	invest2		;   invest2(a); } }
 +	pla;1->0		; return a = y;
 	rts			;} // move_cs()
 
@@ -1069,17 +1058,6 @@ rejctok	sta	TEMPVAR		;uint8_t rejctok(register uint8_t& a) {
 	lda	TEMPVAR		;
 	and	#$f0		; else if (a & 0xf0 == 0) // got no threat cards
 	beq	rejrtn4		;  return 4;
-.if 0
-	lda	#0		; TEMPVAR = a;
-	clc			; // optimization (check flag bits before array)
-	rol	TEMPVAR		;
--	ror	TEMPVAR		; for (a = 0; TEMPVAR; TEMPVAR >>= 1) // 1-count
-	beq	+		;
-	adc	#0		;
-	bcc	-		;  a++;  // (this adc will never set carry)
-+	cmp	#3		;
-	bcs	rejrtn3		; if (a < 3) { // might have 3 copies of a card
-.endif
 	lda	#3		;
 	ldy	#8		;  for (register int8_t y = 7; y >= 0; y--)
 -	cmp	HANDHST-1,y	;   if (HANDHST[y] >= 3)
@@ -1190,19 +1168,9 @@ animrej	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
 	bne	rejectn		; if (a == 'Y' || a == 'y') {
 	ldx	DISCREM		;  register uint8_t x = DISCREM;
 	ldy	HANDREM		;
-.if 0
-	cpy	#4		;
-	beq	+		;  if (HANDREM != 4)
--	brk			;   exit(4);
-+	nop			;
-.endif
 -	dey			;  for (register int8_t y=HANDREM-1; y>=0; y--){
 	bmi	+		;
 	jsr	fasthnd		;   a = fasthnd(y);
-.if 0
-	cmp	#NONCARD	;   if (a >= NONCARD)
-	bcs	--		;    exit(4);
-.endif
 	sta	DISCARD,x	;
 	inx			;   DISCARD[x++] = a;
 	bne	-		;  }
@@ -1228,12 +1196,10 @@ rejmsg2
 
 
 drawone	jsr	drw1new		;void drawone(void) { int8_t a = drw1new();
-.if 1
 	bpl	+		; if (a < 0) { draw deck empty?!? impossible?!?
 	inc	NWOUNDS		;  NWOUNDS++;
 	digitxy	NWOUNDS,WDX,WDY	;  digitxy(NWOUNDS, WDX, WDY);
 	rts			;  return;
-.endif
 +	jsr	intohnd		; } else intohnd(a);
 	jmp	animhnd		;} // drawone()
 
@@ -1244,14 +1210,6 @@ nxtchar	.byte	+SCREENW-1,+4,+SCREENW-4,+4
 arwdisc	sta	TEMPVAR		;void arwdisc(uint8_t& a) {
 	ldx	discx		; TEMPVAR = a;
 	ldy	discy		; register uint8_t x = *discx + *discy *SCREENW;
-.if 0
-	beq	+		;
--	clc			;
-	adc	#SCREENW	;
-	dey			;
-	bne	-		;
-+
-.endif
 -	txa			; for (uint8_t y = 0; y < 4; y++) {
 	clc			;
 	adc	nxtchar,y	;
@@ -1415,230 +1373,6 @@ inv_r2l lda	#0		;
 	jmp	sendr2l		;
 	;rts
 
-.if 0
-pickr2l	pha			;
-	handmsg	prlmsg0,prlmsg1-prlmsg0,prlmsg2-prlmsg1,SCRATCH
-	pla			;
-	tax			;uint3_t pickr2l(register uint8_t a) {// a={0,1}
-	ldy	#1		; register uint6_t x = a, y;
--	txa			; for (y = 1; y <= 4; y++) {
-	and	#$0f		;
-	cmp	STACKHT+8-1,y	;  if ((x & 0x0f) < STACKHT[y+8-1])
-	bcc	+		;   break;
-	txa			;  else
-	clc			;
-	adc	#$10		;   
-	tax			;   x += 16;
-	iny			;
-	cpy	#5		;
-	bcc	-		; }
-	inc	NWOUNDS		; if (y > 4) {
-	digitxy	NWOUNDS,WDX,WDY	;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
-	lda	#NONCARD	;
-	rts			;  return NONCARD;
-+	txa			; }
-	and	#$30		;
-	lsr			;
-	lsr			;
-	sta	TEMPVAR		;
-	lsr			;
-	lsr			;
-	adc	TEMPVAR		; a = (stackx[1]-stackx[0]) * (x >> 4);// o. col
-	clc			;
-	adc	stackx+8	; a += stackx[0];
-	sta	TEMPVAR		;
-	
-	txa			;
-	ror			;
-	lda	TEMPVAR		;
-	ldy	stacky+8	; y = stacky[0];
-	bcc	+		;
-	iny			;
--	clc			;
-+	adc	#SCREENW	;
-	dey			;
-	bne	-		; a += SCREENW * (y + (x & 1));
-	;clc			;
-	;adc	#<SCREENM	;
-	sta	picksm0+1	;
-	sta	picksm1+1	;
-	sta	picksm2+1	;
-	sta	picksm3+1	;
-	sta	picksm4+1	;
-	sta	picksm5+1	;
-	sta	picksm6+1	;
-	sta	picksm7+1	;
-	lda	#>SCREENM	;
-	sta	1+picksm0+1	;
-	sta	1+picksm1+1	;
-	sta	1+picksm2+1	;
-	sta	1+picksm3+1	;
-	sta	1+picksm4+1	;
-	sta	1+picksm5+1	;
-	sta	1+picksm6+1	;
-	sta	1+picksm7+1	;
-picksm	ldy	#2		;
-	lda	#$80		;
-picksm0	eor	$ffff,y		;
-pick_sm				;
-picksm1	sta	$ffff,y		;
-	dey			;
-	lda	#$80		;
-picksm2	eor	$ffff,y		;
-picksm3	sta	$ffff,y		;
-	txa			;
-	pha			;
--	jsr	$ffe4		;
-	sta	TEMPVAR		;
-	beq	-		;
-	pla			;
-	tax			;
-	ldy	#2		;
-	lda	#$80		;
-picksm4	eor	$ffff,y		;
-picksm5	sta	$ffff,y		;
-	dey			;
-	lda	#$80		;
-picksm6	eor	$ffff,y		;
-picksm7	sta	$ffff,y		;
-	lda	TEMPVAR		;
-	cmp	#$91		;//U
-	bne	++		;
-	txa			;
-	and	#$0f		;
-	cmp	#2		;
-	bcs	+		;
-	jmp	picksm		;
-+	dex			;
-	dex			; x -= 2;
-	lda	picksm0+1	;
-	sec			;
-	sbc	#2*SCREENW	;
-	sta	picksm0+1	;
-	sta	picksm1+1	;
-	sta	picksm2+1	;
-	sta	picksm3+1	;
-	sta	picksm4+1	;
-	sta	picksm5+1	;
-	sta	picksm6+1	;
-	sta	picksm7+1	;
-	lda	1+picksm0+1	;
-	sbc	#0		;
-	sta	1+picksm0+1	;
-	sta	1+picksm1+1	;
-	sta	1+picksm2+1	;
-	sta	1+picksm3+1	;
-	sta	1+picksm4+1	;
-	sta	1+picksm5+1	;
-	sta	1+picksm6+1	;
-	sta	1+picksm7+1	;
-	jmp	picksm		;
-
-+	cmp	#$11		;//D
-	bne	++		;
-	txa			;
-	and	#$0f		;
-	cmp	#$0e		;
-	bcc	+		;
-	jmp	picksm		;
-+	inx			;
-	inx			;
-	lda	picksm0+1	;
-	clc			;
-	adc	#2*SCREENW	;
-	sta	picksm0+1	;
-	sta	picksm1+1	;
-	sta	picksm2+1	;
-	sta	picksm3+1	;
-	sta	picksm4+1	;
-	sta	picksm5+1	;
-	sta	picksm6+1	;
-	sta	picksm7+1	;
-	lda	1+picksm0+1	;
-	adc	#0		;
-	sta	1+picksm0+1	;
-	sta	1+picksm1+1	;
-	sta	1+picksm2+1	;
-	sta	1+picksm3+1	;
-	sta	1+picksm4+1	;
-	sta	1+picksm5+1	;
-	sta	1+picksm6+1	;
-	sta	1+picksm7+1	;
-	jmp	picksm		;
-
-+	cmp	#$9d		;//L
-	bne	++		;
-	cpx	#$10		;
-	bcs	+		;
-	jmp	picksm		;
-+	txa			;
-	sec			;
-	sbc	#$10		;
-	tax			;
-	lda	picksm0+1	;
-	sec			;
-	sbc	#5		;
-	sta	picksm0+1	;
-	sta	picksm1+1	;
-	sta	picksm2+1	;
-	sta	picksm3+1	;
-	sta	picksm4+1	;
-	sta	picksm5+1	;
-	sta	picksm6+1	;
-	sta	picksm7+1	;
-	lda	1+picksm0+1	;
-	sbc	#0		;
-	sta	1+picksm0+1	;
-	sta	1+picksm1+1	;
-	sta	1+picksm2+1	;
-	sta	1+picksm3+1	;
-	sta	1+picksm4+1	;
-	sta	1+picksm5+1	;
-	sta	1+picksm6+1	;
-	sta	1+picksm7+1	;
-	jmp	picksm		;
-
-+	cmp	#$1d		;//R
-	bne	++		;
-	cpx	#$30		;
-	bcc	+		;
-	jmp	picksm		;
-+	txa			;
-	clc			;
-	adc	#$10		;
-	tax			;
-	lda	picksm0+1	;
-	clc			;
-	adc	#5		;
-	sta	picksm0+1	;
-	sta	picksm1+1	;
-	sta	picksm2+1	;
-	sta	picksm3+1	;
-	sta	picksm4+1	;
-	sta	picksm5+1	;
-	sta	picksm6+1	;
-	sta	picksm7+1	;
-	lda	1+picksm0+1	;
-	adc	#0		;
-	sta	1+picksm0+1	;
-	sta	1+picksm1+1	;
-	sta	1+picksm2+1	;
-	sta	1+picksm3+1	;
-	sta	1+picksm4+1	;
-	sta	1+picksm5+1	;
-	sta	1+picksm6+1	;
-	sta	1+picksm7+1	;
-	jmp	picksm		;
-
-+	cmp	#$0d		;//Return
-	beq	+		;
-	jmp	picksm		;
-+	txa			;
-	pha			;
-	handmsg	SCRATCH,prlmsg1-prlmsg0,prlmsg2-prlmsg1
-	pla			;
-	tax			;
-.else
 pickr2l	pha			;
 	handmsg	prlmsg0,prlmsg1-prlmsg0,prlmsg2-prlmsg1,SCRATCH
 	pla			;
@@ -1648,7 +1382,6 @@ pick_sm
 	handmsg	SCRATCH,prlmsg1-prlmsg0,prlmsg2-prlmsg1
 	pla			;
 	tax			; x = pick_of(a, &pick_sm);
-.endif
 	lsr			;
 	lsr			;
 	lsr			;
@@ -1760,37 +1493,6 @@ wrnmsg1	.byte   $90,$92,$85,$93 ; PRES
 wrnmsg2
 
 
-.if 0
-offmsg0	.byte	$0f,$0e,$20,$14	; ON T
-	.byte	$0f,$10,$20,$0f	; OP O
-	.byte	$06,$20,$10,$09	; F PI
-	.byte	$0c,$05,$20,$31	; LE 1
-	.byte	$2d,$34,$3f	; -4?
-offmsg1	.byte   $90,$92,$85,$93 ; PRES
-	.byte   $93,$a0,$b0,$a0 ; S 0 
-	.byte   $94,$8f,$a0,$83 ; TO C
-	.byte	$81,$8e,$83,$85	; ANCE
-	.byte	$8c		; L
-offmsg2
-oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
-	ldx	#$15		;uint8_t oprompt(void) {
-	ldy	#$00		; do {
-	lda	#offmsg1-offmsg0;  register uint8_t a;
-	txtclip	SCRATCH		;
-	lda	#offmsg1-offmsg0;
-	replace	offmsg0		;
--	jsr	$ffe4		; handmsg("TO WHICH PILE 1-4?"/*RVS ON*/
-	beq	-		; "PRESS 0 TO CANCEL"/*RVS OFF*/,18,17,SCRATCH);
-	pha			; a = getchar();
-	lda	#offmsg1-offmsg0;
-	replace	SCRATCH		;
-	handmsg	SCRATCH+offmsg1-offmsg0,offmsg2-offmsg1,0
-	pla			; handmsg(SCRATCH, 17, 15); // pop backing store
-offmsg0	.byte	$0f,$0e,$20,$14	; ON T
-	.byte	$0f,$10,$20,$0f	; OP O
-	.byte	$06,$20,$10,$09	; F PI
-	.byte	$0c,$05,$3f	; LE?
-.else
 offmsg0	.byte	$20		;
 	.byte	$0f,$0e,$14,$0f	; ONTO
 	.byte	$20,$17,$08,$09	;  WHI
@@ -1819,7 +1521,6 @@ oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
 	lsr			;
 	lsr			;
 	adc	#'1'		;
-.endif
 	cmp	#'5'		;
 	bcc	+		;
 	jmp	oprompt		;
@@ -1844,25 +1545,9 @@ b_label	.byte	$14,$08,$05,$20	; THE
 	.byte	$06,$09,$03,$05	; FICE
 
 +
-.if 1
 	.byte	$11,$05,(+)-*-3	; (17,5)
 b_arwup	.byte	$4e		; /
 +
-.else
-	.byte	$11,$04,(+)-*-3	; (17,4)
-b_arwup	.byte	$64,$20,$20,$20	; _
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$4e,$65		; /[
-+
-.endif
 
 +	.byte	$04,$06,(+)-*-3	; (4,6)
 b_threa	.byte	$14,$08,$12,$05	; THRE
@@ -1900,25 +1585,9 @@ b_fodds	.byte	$1e,$06,$31,$20	; ^F1
 	.byte	$1e,$06,$37,$20	; ^F7
 
 +
-.if 1
 	.byte	$15,$0f,(+)-*-3	; (21,15)
 b_arwdn	.byte	$4e		; /
 +
-.else
-	.byte	$14,$0f,(+)-*-3	; (20,15)
-b_arwdn	.byte	$67,$43,$20,$20	; ]/
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$20,$20,$20	;
-	.byte	$20,$77		; ^
-+
-.endif
 
 +	.byte	$01,$15,(+)-*-3	; (1,21)
 b_feven	.byte	$06,$32,$40,$20	; F2-
