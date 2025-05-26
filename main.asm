@@ -1354,7 +1354,7 @@ plrmsg1	.byte	$8c,$af,$92,$a0	; L/R
 plrmsg2
 
 sendl2r	cmp	#NONCARD	;void sendl2r(register uint8_t a) {
-	beq	+		; if (a == NONCARD) return;// wound in pickl2r()
+	beq	++		; if (a == NONCARD) return;// wound in pickl2r()
 	jsr	intohnd		; a = intohnd(a);// momentary hand slot 1 ~ 4
 	pha			; register uint8_t x, y;
 	clc			; // 1,2,3,4
@@ -1376,7 +1376,7 @@ sendl2r	cmp	#NONCARD	;void sendl2r(register uint8_t a) {
 	inc	NWOUNDS		;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
 	digitxy	NWOUNDS,WDX,WDY	; }
 +	pla			;
-	rts			;} // sendl2r()
++	rts			;} // sendl2r()
 
 thr_r2l	lda	#1		;
 	jsr	pickr2l		;
