@@ -1,4 +1,5 @@
 ;;; 
+
 solvlen	.byte	(+)-tosolve
 tosolve	.byte	$33,$20,$03,$0f	; 3 CO
 	.byte	$0c,$20,$0f,$06	; L OF
@@ -38,7 +39,7 @@ gamewon	ldx	#0		;uint1_t gamewon(void) {
 +	inx			;     }
 	inx			;    }
 	dey			;
-	beq	++		;
+	beq	+		;
 	dey			;    y_ -= 2; // skip intervening investig. card
 	bne	-		;   }
 +	pla;1->0		;
