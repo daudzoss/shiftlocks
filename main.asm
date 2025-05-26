@@ -394,7 +394,7 @@ trymove	and	#$03		;
 	bne	wndleft		;   if (!movedok(MOVESEL)) {
 	jsr	warning		;    if (warning() == 0 /* 0 wounds accepted */)
 	bne	acceptw		;
-	jmp	notfkey		;     continue;
+	jmp	getmove		;     continue;
 acceptw	lda	MOVESEL		;
 	jsr	fromhnd		;
 	ldy	DISCREM		;
@@ -1328,6 +1328,8 @@ pickbot	pick_cs	BOT_ROW		;  a = x = pick_cs(BOT_ROW, x);
 picktor	;php			;
 	pha			;
 	;tax			;
+	lda	#0		;
+	sta	STACKHT,x	; STACKHT[x] = NONCARD; // reset the height to 0
 	lda	stacky,x	;
 	tay			;
 	lda	stackx,x	;
@@ -1354,14 +1356,27 @@ plrmsg2
 sendl2r	cmp	#NONCARD	;void sendl2r(register uint8_t a) {
 	beq	+		; if (a == NONCARD) return;// wound in pickl2r()
 	jsr	intohnd		; a = intohnd(a);// momentary hand slot 1 ~ 4
+	pha			; register uint8_t x, y;
 	clc			; // 1,2,3,4
 	adc	#3		; a += 3; // 4,5,6,7 i.e. moving to office
 	jsr	move_of		; // spoof playing that card from hand to office
-	bne	+		; if (move_of(a) == 0) {//FIXME?: -1 not checked
+	bne	+		; if ((x = move_of(a)) == 0) {//FIXME?: -1 not checked
+	pla			;
+	pha			;
+	tax			;
+	lda	HAND-1,x	;
+	ldy	DISCREM		;
+	sta	DISCARD,y	;
+	iny			;
+	sty	DISCREM		;  DISCARD[DISCREM++] = HAND[x - 1];//discard it
+	lda	#NONCARD	;
+	sta	HAND-1,x	;  HAND[x - 1] = NONCARD;// clear momentary slot
+	dec	HANDREM		;  HANDREM--; // intohnd() bumped it up, so undo
 	dec	TOFFICE		;  TOFFICE--; // undo spurious inc by move_of()
 	inc	NWOUNDS		;  digitxy(++NWOUNDS, WDX, WDY); // FIXME: digitxy() redundant?
 	digitxy	NWOUNDS,WDX,WDY	; }
-+	rts			;} // sendl2r()
++	pla			;
+	rts			;} // sendl2r()
 
 thr_r2l	lda	#1		;
 	jsr	pickr2l		;
