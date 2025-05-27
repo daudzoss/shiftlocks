@@ -200,7 +200,7 @@ cardclr	.byte	$66,$63,$64,$65
 	.byte	$32,$3a,$58,$69,0,0
 drawx	.byte	$12
 drawy	.byte	$10
-discx	.byte	$12
+discx	.byte	$11
 discy	.byte	$00
 solvex	.byte	$1b
 solvey	.byte	$15
@@ -251,12 +251,11 @@ newhand	jsr	drw4hnd		;  do {
 	bne	newhand		;  } while (rejctok(HANDFOM) && animrej());
 
 +	lda	#2		;  // we have a hand that was acceptable
-	sta	TOSCENE		;  TOSCENE = TOFFICE = 2;//#cards not yet in each
+	sta	TOSCENE		;  TOSCENE = TOFFICE = 2; // mandatory unplayed
 	sta	TOFFICE		;  // now play half to scene and half to office
 
-getmove	digitxy	TOSCENE,$11,0	;  do {
-	digitxy	TOFFICE,$15,0	;   digitxy(TOSCENE,*discx-1,*discy);
-	jsr	$ffe4		;   digitxy(TOFFICE,*discx+3,*discy);
+getmove	jsr	cdwnsho		;  do {
+	jsr	$ffe4		;   cdwnsho();
 	beq	getmove		;   a = getchar();
 	cmp	#DEL_KEY	;   if (a == DEL_KEY) {
 	bne	+		;
@@ -430,6 +429,10 @@ wonmsg1	.byte	$a0,$81,$8e,$99	;  ANY
 	.byte	$85,$98,$89,$94	; EXIT
 	.byte	$a0		;
 wonmsg2
+
+cdwnsho	digitxy	TOSCENE,$10,0	;void cdwnsho(void) { digitxy(TOSCENE,*discx-2,
+	digitxy	TOFFICE,$14,0	; *discy);   digitxy(TOFFICE,*discx+2,*discy);
+	rts			;} // cdwnsho()
 
 ARROWOD	= SCREENM+SCREENW*$0f+1-2
 ARROWEV	= ARROWOD+6*SCREENW
@@ -1560,7 +1563,7 @@ b_label	.byte	$14,$08,$05,$20	; THE
 	.byte	$06,$09,$03,$05	; FICE
 
 +
-	.byte	$11,$05,(+)-*-3	; (17,5)
+	.byte	$10,$05,(+)-*-3	; (16,5)
 b_arwup	.byte	$4e		; /
 +
 
@@ -1568,15 +1571,14 @@ b_arwup	.byte	$4e		; /
 b_threa	.byte	$14,$08,$12,$05	; THRE
 	.byte	$01,$14,$13,$20	; ATS
 	.byte	$20,$20,$20,$20	;
-	.byte	$20,$04,$09,$13	;  DIS
-	.byte	$2d		; -
+	.byte	$04,$09,$13,$2d	; DIS-
 
 +	.byte	$03,$07,(+)-*-3	; (3,7)
 b_wound	.byte	$97,$8f,$95,$8e	; WOUN
 	.byte	$84,$93,$ba,$a0	; DS:
 	.byte	$bf,$20,$20,$20	; ?
-	.byte	$20,$20,$03,$01	;   CA
-	.byte	$12,$04		; RD
+	.byte	$20,$03,$01,$12	;  CAR
+	.byte	$04		; D
 
 +	.byte	$01,$08,(+)-*-3	; (1,8)
 b_inves	.byte	$09,$0e,$16,$05	; INVE
@@ -1584,7 +1586,7 @@ b_inves	.byte	$09,$0e,$16,$05	; INVE
 	.byte	$01,$14,$09,$0f	; ATIO
 	.byte	$0e,$13		; NS
 
-+	.byte	$11,$09,(+)-*-3	; (17,9)
++	.byte	$10,$09,(+)-*-3	; (16,9)
 b_dpile	.byte	$10,$09,$0c,$05	; PILE
 
 +	.byte	$12,$0c,(+)-*-3	; (18,12)
