@@ -256,9 +256,30 @@ redoall	lda	REDOMAX		;void redoall(void) {
 	jmp	-		;} // redoall()
 	
 redraws	jsr	discsho		;void redraws(void) {
-	jsr	drawsho		; discsho(); drawsho();
-	jsr 	handsho		; handsho();
-;;; FIXME: need to loop through STACK[0~11] redrawing all
+	jsr	drawsho		; discsho();
+	jsr 	handsho		; drawsho();
+	ldx	#8		; handsho();
+-	txa			; for (register uint8_t x = 8; x; x--) {
+	pha			;  register uint8_t a;
+	lda	STACKHT-1,x	;
+	beq	+		;  if (STACKHT[x-1])
+	dex			;
+	txa			;
+	inx			;   a = x - 1; // just the card number itself
+	jmp	++		;  else
++	lda	#NONCARD	;   a = NONCARD; // blank out that stack
++	pha			;
+	ldy	stacky-1,x	;  
+	lda	stackx-1,x	;
+	tax			;
+	pla			;
+	clc			;
+	jsr	cardsho		;  cardsho(0, a, stackx[x-1], stacky[x-1]);
+	pla			;
+	tax			;
+	dex			;
+	bne	-		; }
+;;; FIXME: need to loop through STACK[8~11] redrawing all	
 	rts			;} // redraws()
 
 F1_KEY	= $85
