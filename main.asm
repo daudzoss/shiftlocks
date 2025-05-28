@@ -154,106 +154,106 @@ UNDOLIM = UNSAVED + $0b		; first byte not read-writeable in RAM
 REDOMAX	= UNSAVED + $0c
 SCRATCH	= UNSAVED + $10		; must be last
 
-initptr	sta	1+ZP+0		;
-	lda	#>UNDOABL	;
-	sta	1+ZP+2		;
+initptr	sta	1+ZP		;register uint8_t initptr(register uint8_t a) {
+	lda	#>UNDOABL	; zp = (uint8_t*) (a << 8); // save slot to use
+	sta	1+ZP+2		; zp2 = (uint8_t*) UNDOABL; // latest game state
 	lda	#0		;
-	sta	ZP+0		;
+	sta	ZP		;
 	sta	ZP+2		;
-	ldy	#UNDOEND-UNDOABL;
-	rts			;
+	ldy	#UNDOEND-UNDOABL; return y = UNDOEND-UNDOABL; // #bytes to save
+	rts			;} // initptr()
 	
-memprob	jsr	initptr		;
+memprob	jsr	initptr		;void memprob(register uint8_t a) {
  lda #$40
  rts
--	lda	#$55		;
-	sta	(ZP),y		;
-	lda	(ZP),y		;
-	cmp	#$55		;
-	bne	+		;
+-	lda	#$55		; register uint8_t y = initptr(a);
+	sta	(ZP),y		; do {
+	lda	(ZP),y		;  zp[y] = 0x55; // one beyond last state byte
+	cmp	#$55		;  if (zp[y] != 0x55)
+	bne	+		;   break;
 	lda	#$aa		;
-	sta	(ZP),y		;
+	sta	(ZP),y		;  zp[y] = 0xaa; // all bits flipped from 0x55
 	lda	(ZP),y		;
-	cmp	#$aa		;
-	bne	+		;
+	cmp	#$aa		;  if (zp[y] != 0xaa)
+	bne	+		;   break;
 	inc	1+ZP		;
-	lda	1+ZP		;
-	bne	-		;
-+	rts			;
+	bne	-		; } while (zp += 0x0100); // stop infinite wrap
+	lda	1+ZP		; return a = zp >>8; // page where reads failed
++	rts			;} // memprob()
 
-snpshot	lda	UNDOPTR		;
-	cmp	UNDOLIM		;
-	bcc	+		;
-
-	ldx	#>undobuf	 ;
+snpshot	lda	UNDOPTR		;void snpshot(void) {
+	cmp	UNDOLIM		; register uint8_t x, y;
+	bcc	+		; while (UNDOPTR >= UNDOLIM) { // all slots full
+	ldx	#>undobuf	;
 	lda	#0		;
-	sta	ZP+0		;
+	sta	ZP		;
 	sta	ZP+2		;
-	inx			;
--	stx	1+ZP+2		;
-	ldy	#UNDOEND-UNDOABL;
--	lda	(ZP+2),y	;
-	sta	(ZP),y		;
-	dey			;
-	cpy	#$ff		;
-	bne	-		;
-	stx	1+ZP		;
+	stx	1+ZP		;  zp = undobuf; // 1st save slot is obliterated
+	inx			;  for (x = (zp+0x100)>>8; x < UNDOLIM>>8; x++){
+-	stx	1+ZP+2		;   zp2 = x << 8; // subsequent slots scoot down
+	ldy	#UNDOEND-UNDOABL;   for (y = UNDOEND-UNDOABL; y; y--) {
+-	dey			;
+	lda	(ZP+2),y	;
+	sta	(ZP),y		;    zp[y-1] = zp2[y-1];
+	cpy	#0		;
+	bne	-		;   }
+	stx	1+ZP		;   zp = zp2;
 	inx			;
 	cpx	UNDOLIM		;
-	bcs	--		;
-	
-	dec	UNDOPTR		;
-	jmp	snpshot		;
+	bcc	--		;  }
+	dec	UNDOPTR		;  if (!--UNDOPTR) exit(0); // stop infinite wrap
+	bne	snpshot		; }
+	brk			;  
 	brk			;
-	
-+	jsr	initptr		;
--	lda	(ZP+2),y	;
-	sta	(ZP),y		;
-	dey			;
-	cpy	#$ff		;
-	bne	-		;
-	inc	UNDOPTR		;
-	inc	REDOMAX		;
-	rts			;
++	sta	REDOMAX		; // UNDOPTR now page number of last valid slot
+	jsr	initptr		; // REDOMAX has been set to UNDOPTR
+-	dey			; for (y = initptr(UNDOPTR); y; y--) {
+	lda	(ZP+2),y	;
+	sta	(ZP),y		;  zp[y] = zp2[y]; // state byte saved into slot
+	cpy	#0		;
+	bne	-		; }
+	inc	UNDOPTR		; UNDOPTR++;
+	inc	REDOMAX		; REDOMAX++;
+	rts			;} //snpshot()
 
-undomov	dec	UNDOPTR		;
-	lda	UNDOPTR		;
+undomov	dec	UNDOPTR		;void undomov(void) {
+	lda	UNDOPTR		; UNDOPTR--;
 	cmp	#>undobuf	;
-	bcs	+		;
-	inc	UNDOPTR		;
-	rts			;
-+	jsr	initptr		;
--	lda	(ZP),y		;
-	sta	(ZP+2),y	;
-	dey			;
-	cpy	#$ff		;
-	bne	-		;
-	jsr	redraws		;
-	rts			;
+	bcs	+		; if (UNDOPTR < undobuf>>8) {
+	inc	UNDOPTR		;  UNDOPTR++; // can't undo any more; hold fast
+	rts			; } else {
++	jsr	initptr		;  register uint8_t y;
+-	dey			;
+	lda	(ZP),y		;  for (y = initptr(UNDOPTR); y; y--) {
+	sta	(ZP+2),y	;   zp2[y] = zp[y]; // slot byte saved into state
+	cpy	#0		;  }
+	bne	-		; }
+	jsr	redraws		; redraws();
+	rts			;} // undomov()
 
-redomov	lda	UNDOPTR		;
+redomov	lda	UNDOPTR		;void redomov(void) {
 	cmp	REDOMAX		;
-	bcc	+		;
-	rts			;
-+	inc	UNDOPTR		;
+	bne	+		; if (UNDOPTR == REDOMAX)
+	rts			;  return; // can't redo any more; hold fast
++	inc	UNDOPTR		; UNDOPTR++;
 	lda	UNDOPTR		;
-	jsr	initptr		;
--	lda	(ZP),y		;
-	sta	(ZP+2),y	;
-	dey			;
-	cpy	#$ff		;
-	bne	-		;
-	jsr	redraws		;
-	rts			;
-redoall	lda	REDOMAX		;
+	jsr	initptr		; register uint8_t y;
+-	dey			;
+	lda	(ZP),y		; for (y = initptr(UNDOPTR); y; y--) {
+	sta	(ZP+2),y	;  zp2[y] = zp[y]; // slot byte saved into state
+	cpy	#0		;
+	bne	-		; }
+	jsr	redraws		; redraws();
+	rts			;} // redomov()
+redoall	lda	REDOMAX		;void redoall(void) {
 	cmp	UNDOPTR		;
-	bne	+		;
-	rts			;
-+	sta	UNDOPTR		;
-	sec			;
-	sbc	#1		;
-	jsr	initptr		;
-	jmp	-		;
+	bne	+		; if (UNDOPTR == REDOMAX)
+	rts			;  return; // can't redo any more; hold fast
++	sta	UNDOPTR		; UNDOPTR = REDOMAX;
+	sec			; for (y = initptr(REDOMAX - 1); y; y--) {
+	sbc	#1		;  zp2[y] = zp[y]; // slot byte saved into state
+	jsr	initptr		; }
+	jmp	-		;} // redoall()
 	
 redraws	jsr	discsho		;
 	jsr	drawsho		;
@@ -1070,7 +1070,7 @@ selfcla	.byte	<SCREENC	;void selfclr(uint8_t a, uint8_t y) {
 	.byte	>SCREENC	; selfcla[y] = a; // sta $XXXX,y
 	rts			;} // selfclr()
 
-initstk	lda	#$00		;void initstk(void) {
+initstk	lda	#0		;void initstk(void) {
 	ldx	#$0c		; for (register uint8_t x = 11; x >= 0; x--)
 -	sta	STACKHT-1,x	;
 	dex			;  STACKHT[x] = 0;
@@ -1652,7 +1652,7 @@ offmsg1
 offmsg2
 oprompt	handmsg	offmsg1,offmsg2-offmsg1,0,SCRATCH+offmsg1-offmsg0
 	ldx	#$16		;uint8_t oprompt(void) {
-	ldy	#$00		; do {
+	ldy	#0		; do {
 	lda	#offmsg1-offmsg0;  register uint8_t a;
 	txtclip	SCRATCH		;
 	lda	#offmsg1-offmsg0;
