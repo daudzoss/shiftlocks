@@ -430,8 +430,15 @@ wonmsg1	.byte	$a0,$81,$8e,$99	;  ANY
 	.byte	$a0		;
 wonmsg2
 
+.if 0
 cdwnsho	digitxy	TOSCENE,$10,0	;void cdwnsho(void) { digitxy(TOSCENE,*discx-2,
 	digitxy	TOFFICE,$14,0	; *discy);   digitxy(TOFFICE,*discx+2,*discy);
+.else
+cdwnsho	lda	TOSCENE		;void cdwnsho(void) {
+	bubble2	SCREENM,$0f,$37	;
+	lda	TOFFICE		; bubble2(TOSCENE, SCREENM, 0x10, 0x09);
+	bubble2	SCREENM,$15,$3d	; bubble2(TOFFICE, SCREENM, 0x14, 0x15);
+.endif
 	rts			;} // cdwnsho()
 
 ARROWOD	= SCREENM+SCREENW*$0f+1-2
@@ -1209,7 +1216,7 @@ drawone	jsr	drw1new		;void drawone(void) { int8_t a = drw1new();
 
 arwstat	.byte	$ff
 arwchar	.byte	$e9,$df,$5f,$69
-nxtchar	.byte	+SCREENW-1,+4,+SCREENW-4,+4
+nxtchar	.byte	+2*SCREENW-1,+4,+SCREENW-4,+4
 arwdisc	sta	TEMPVAR		;void arwdisc(uint8_t& a) {
 	ldx	discx		; TEMPVAR = a;
 	ldy	discy		; register uint8_t x = *discx + *discy *SCREENW;

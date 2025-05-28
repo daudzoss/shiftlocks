@@ -169,7 +169,7 @@ pick_cs	.macro	row		;inline uint3_t pick_cs(uint8_t* row, register
 	txa			; }
 	.endm			;} // pick_cs()
 
-pick_of	.macro	allowy=1	;inline uint3_t pickr2l(register uint8_t a, x) {
+pick_of	.macro	allowy=1	;inline uint3_t pick_of(register uint8_t a, x) {
 	tax			; register uint6_t x = a, y;
 	ldy	#1		;
 -	txa			; for (y = 1; y <= 4; y++) {
@@ -391,13 +391,36 @@ pick_of	.macro	allowy=1	;inline uint3_t pickr2l(register uint8_t a, x) {
 
 +	cmp	#$0d		;
 	beq	+		; } while (TEMPVAR != 0x0d); // at last, Return
-	jmp	----------	;} // pick_cs()
+	jmp	----------	;
 +	lda	(---------)+1	;
 	sta	(+)-2		;
 	lda	1+(---------)+1	;
 	sta	(+)-1		;
-	txa			;
+	txa			; return x;
 	jmp	+		;
-	bit	$ffff		;
+	bit	$ffff		;// <-- last 2 bytes of macro will point to card
 +
-	.endm
+	.endm			;} // pick_of()
+
+bubble2	.macro	base,xmsb,xlsb	;void bubble2(register uint2_t a, uint8_t* base,
+	ror			;      const uint8_t xmsb, const uint8_t xlsb) {
+	ror			;
+	ror			;
+	ldx	#\xmsb		;
+	sta	TEMPVAR		;
+	bit	TEMPVAR		;
+	bmi	++		; if (a < 2) {
+	lda	#$51	;solid	;
+	sta	\base,x		;  base[xmsb] = 0x51;
+	ldx	#\xlsb		;
+	bvs	+		;  if (a < 1)
+	sta	\base,x		;   base[lsb] = 0x51;
+	bvc	+++		;  else
++	lda	#$57	;hollow	;
+	sta	\base,x		;   base[lsb] = 0x57;
+	bvs	++		;
++	lda	#$57	;hollow	; } else {
+	sta	\base,x		;  base[xmsb] = 0x57;
+	ldx	#\xlsb		;  base[xlsb] = 0x57;
+	sta	\base,x		; }
++	.endm			;} // bubble2()
