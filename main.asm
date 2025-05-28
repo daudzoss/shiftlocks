@@ -140,21 +140,125 @@ HANDFOM	= UNDOABH + $c
 MOVESEL	= UNDOABH + $d
 TOSCENE	= UNDOABH + $e
 TOFFICE	= UNDOABH + $f
-
+UNDOEND	= UNDOABH + $10		; must be last
+	
 UNSAVED	= vararea + $100
-.if UNSAVED <= TOFFICE
+.if UNSAVED <= UNDOEND
 .error "saved variables crashed into ceiling, obliterated UNSAVED"
 .endif
 HANDHST	= UNSAVED + $0
 ACURSOR	= UNSAVED + $08
 TEMPVAR	= UNSAVED + $09
-SCRATCH	= UNSAVED + $0a		; must be last
+UNDOPTR	= UNSAVED + $0a
+UNDOLIM = UNSAVED + $0b		; first byte not read-writeable in RAM
+REDOMAX	= UNSAVED + $0c
+SCRATCH	= UNSAVED + $10		; must be last
 
-snpshot	rts
+initptr	sta	1+ZP+0		;
+	lda	#>UNDOABL	;
+	sta	1+ZP+2		;
+	lda	#0		;
+	sta	ZP+0		;
+	sta	ZP+2		;
+	ldy	#UNDOEND-UNDOABL;
+	rts			;
+	
+memprob	jsr	initptr		;
+ lda #$40
+ rts
+-	lda	#$55		;
+	sta	(ZP),y		;
+	lda	(ZP),y		;
+	cmp	#$55		;
+	bne	+		;
+	lda	#$aa		;
+	sta	(ZP),y		;
+	lda	(ZP),y		;
+	cmp	#$aa		;
+	bne	+		;
+	inc	1+ZP		;
+	lda	1+ZP		;
+	bne	-		;
++	rts			;
 
-undomov	rts
+snpshot	lda	UNDOPTR		;
+	cmp	UNDOLIM		;
+	bcc	+		;
 
-redomov	rts
+	ldx	#>undobuf	 ;
+	lda	#0		;
+	sta	ZP+0		;
+	sta	ZP+2		;
+	inx			;
+-	stx	1+ZP+2		;
+	ldy	#UNDOEND-UNDOABL;
+-	lda	(ZP+2),y	;
+	sta	(ZP),y		;
+	dey			;
+	cpy	#$ff		;
+	bne	-		;
+	stx	1+ZP		;
+	inx			;
+	cpx	UNDOLIM		;
+	bcs	--		;
+	
+	dec	UNDOPTR		;
+	jmp	snpshot		;
+	brk			;
+	
++	jsr	initptr		;
+-	lda	(ZP+2),y	;
+	sta	(ZP),y		;
+	dey			;
+	cpy	#$ff		;
+	bne	-		;
+	inc	UNDOPTR		;
+	inc	REDOMAX		;
+	rts			;
+
+undomov	dec	UNDOPTR		;
+	lda	UNDOPTR		;
+	cmp	#>undobuf	;
+	bcs	+		;
+	inc	UNDOPTR		;
+	rts			;
++	jsr	initptr		;
+-	lda	(ZP),y		;
+	sta	(ZP+2),y	;
+	dey			;
+	cpy	#$ff		;
+	bne	-		;
+	jsr	redraws		;
+	rts			;
+
+redomov	lda	UNDOPTR		;
+	cmp	REDOMAX		;
+	bcc	+		;
+	rts			;
++	inc	UNDOPTR		;
+	lda	UNDOPTR		;
+	jsr	initptr		;
+-	lda	(ZP),y		;
+	sta	(ZP+2),y	;
+	dey			;
+	cpy	#$ff		;
+	bne	-		;
+	jsr	redraws		;
+	rts			;
+redoall	lda	REDOMAX		;
+	cmp	UNDOPTR		;
+	bne	+		;
+	rts			;
++	sta	UNDOPTR		;
+	sec			;
+	sbc	#1		;
+	jsr	initptr		;
+	jmp	-		;
+	
+redraws	jsr	discsho		;
+	jsr	drawsho		;
+;;; FIXME: need to loop through STACK[0~11] redrawing all
+	rts
 
 F1_KEY	= $85
 F3_KEY	= $86
@@ -166,6 +270,8 @@ F6_KEY	= $8b
 F8_KEY	= $8c
 DEL_KEY	= $14
 INS_KEY	= $94
+HOM_KEY = $13
+CLR_KEY = $93
 
 start
 
@@ -226,6 +332,11 @@ main
 	sta	DISCREM		;
 	sta	HANDREM		;
 	sta	NWOUNDS		; NWOUNDS = DISCREM = HANDREM = 0;
+	lda	#>undobuf	;
+	sta	UNDOPTR		;
+	sta	REDOMAX		; UNDOPTR = REDOMAX = undobuf;
+	jsr	memprob		;
+	sta	UNDOLIM		; UNDOLIM = memprob(UNDOPTR);
 .if BASIC
 	jsr	bckdrop		; bckdrop(); // draw most of the scren
 .endif
@@ -267,6 +378,19 @@ getmove	jsr	cdwnsho		;  do {
 	jsr	redomov		;    redomov();   
 	jmp	getmove		;    continue;
 
++	cmp	#HOM_KEY	;
+	bne	+		;   } else if (a == HOM_KEY) {
+	jsr	redoall		;    redomov();   
+	jmp	getmove		;    continue;
+
++	cmp	#CLR_KEY	;
+	bne	+		;   } else if (a == CLR_KEY) {
+	lda	#>undobuf	;
+	sta	UNDOPTR		;
+	sta	REDOMAX		;    UNDOPTR = REDOMAX = undobuf;	
+	jmp	getmove		;    continue;
+
+	
 +	cmp	#'1'		;
 	bcc	notfkey		;   } else if (a >= '1'
 	cmp	#'8'+1		;              &&
@@ -1666,8 +1790,8 @@ bckdrop	ldx	#bckdrop-petscii;void bckdrop(void) {
 .endif
 
 pre_end
-.align	UNSAVED-UNDOABL
-vararea
 .align	$100
+vararea
+* = * + $200
 undobuf
 .end
