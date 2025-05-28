@@ -228,8 +228,8 @@ undomov	dec	UNDOPTR		;void undomov(void) {
 	sta	(ZP+2),y	;   zp2[y] = zp[y]; // slot byte saved into state
 	cpy	#0		;  }
 	bne	-		; }
-	jsr	redraws		; redraws();
-	rts			;} // undomov()
+	jmp	redraws		; redraws();
+	;rts			;} // undomov()
 
 redomov	lda	UNDOPTR		;void redomov(void) {
 	cmp	REDOMAX		;
@@ -243,8 +243,8 @@ redomov	lda	UNDOPTR		;void redomov(void) {
 	sta	(ZP+2),y	;  zp2[y] = zp[y]; // slot byte saved into state
 	cpy	#0		;
 	bne	-		; }
-	jsr	redraws		; redraws();
-	rts			;} // redomov()
+	jmp	redraws		; redraws();
+	;rts			;} // redomov()
 redoall	lda	REDOMAX		;void redoall(void) {
 	cmp	UNDOPTR		;
 	bne	+		; if (UNDOPTR == REDOMAX)
@@ -255,10 +255,11 @@ redoall	lda	REDOMAX		;void redoall(void) {
 	jsr	initptr		; }
 	jmp	-		;} // redoall()
 	
-redraws	jsr	discsho		;
-	jsr	drawsho		;
+redraws	jsr	discsho		;void redraws(void) {
+	jsr	drawsho		; discsho(); drawsho();
+	jsr 	handsho		; handsho();
 ;;; FIXME: need to loop through STACK[0~11] redrawing all
-	rts
+	rts			;} // redraws()
 
 F1_KEY	= $85
 F3_KEY	= $86
@@ -353,13 +354,13 @@ newhand	jsr	drw4hnd		;  do {
 	brk			;    exit(1); // more than 44 cards in stacks?!?
 	.byte	$1		;
 +	jsr	snpshot		;   snpshot();
-	jsr	animhnd		;   animhnd();// draw empty deck pile after if 0
+	jsr	handsho		;   handsho();// draw empty deck pile after if 0
 	jsr	discsho		;   discsho();// ,empty discard pile if shuffled
 	lda	HANDFOM		;
 	jsr	rejctok		;
       	beq	+		;
-	jsr	animrej		;
-	bne	newhand		;  } while (rejctok(HANDFOM) && animrej());
+	jsr	handrej		;
+	bne	newhand		;  } while (rejctok(HANDFOM) && handrej());
 
 +	lda	#2		;  // we have a hand that was acceptable
 	sta	TOSCENE		;  TOSCENE = TOFFICE = 2; // mandatory unplayed
@@ -529,7 +530,7 @@ wndleft	digitxy	NWOUNDS,WDX,WDY	;   }
 	cmp	#$03		;
 	bcc	+		;   if (NWOUNDS >= 3)
 	jmp	youlost		;    exit(0);
-+	jsr	animhnd		;   animhnd(); // show the played slot as blank
++	jsr	handsho		;   handsho(); // show the played slot as blank
 	jsr	snpshot		;   snpshot();
 	lda	HANDREM		;
 	beq	+		;
@@ -876,7 +877,7 @@ movepwr	tay			; }
 	rts			;} // movedok()
 
 invest2	pha			;void invest2 (uint2_t a) {
-	jsr	animhnd		; animhnd(); // show gap for the played card
+	jsr	handsho		; handsho(); // show gap for the played card
 	pla			;
 	ror			;
 	ror			; // a will contain an investigation card (0~3)
@@ -1203,7 +1204,7 @@ rejrtn4	clc			;
 	adc	#4		;
 rejrtn3	rts			;} // rejctok()
 
-animhnd	ldx	#4		;void animhnd(void) { // just paint them for now
+handsho	ldx	#4		;void handsho(void) { // just paint them for now
 -	txa			;
 	pha			; for (register int8_t x = 4; x>=0; x--) {
 	lda	HAND-1,x	;  register int8_t a = HAND[x];
@@ -1217,7 +1218,7 @@ animhnd	ldx	#4		;void animhnd(void) { // just paint them for now
 	pla			;  }
 	tax			; }
 	dex			; drawsho();
-	bne	-		;} // animhnd()
+	bne	-		;} // handsho()
 drawsho	ldx	drawx		;void drawsho(void) {
 	ldy	drawy		; register uint8_t x, y;
 	lda	DECKREM		;
@@ -1290,8 +1291,8 @@ askmsg1	.byte	$a0,$90,$92,$85	;  PRE
 	.byte	$a0,$99,$85,$93	;  YES
 	.byte	$a0		;
 askmsg2
-				;uint1_t animrej(void) {
-animrej	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
+				;uint1_t handrej(void) {
+handrej	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
 -	jsr	$ffe4		; handmsg("DISCARD & REDRAW?"/*RVS ON*/
 	beq	-		;         " PRESS Y FOR YES "/*RVS OFF*/, 17, 17,
 	and	#$df		;         SCRATCH);
@@ -1315,7 +1316,7 @@ animrej	handmsg	rejmsg0,rejmsg1-rejmsg0,rejmsg2-rejmsg1,SCRATCH
 rejecty	lda	#1		;  return 1;
 	rts			; } else
 rejectn	lda	#0		;  return 0;
-	rts			;} // animrejs()
+	rts			;} // handrej()
 rejmsg0	.byte	$04,$09,$13,$03	; DISC
 	.byte	$01,$12,$04,$20	; ARD 
 	.byte	$26,$20,$12,$05	; & RE
@@ -1335,7 +1336,7 @@ drawone	jsr	drw1new		;void drawone(void) { int8_t a = drw1new();
 	digitxy	NWOUNDS,WDX,WDY	;  digitxy(NWOUNDS, WDX, WDY);
 	rts			;  return;
 +	jsr	intohnd		; } else intohnd(a);
-	jmp	animhnd		;} // drawone()
+	jmp	handsho		;} // drawone()
 
 
 arwstat	.byte	$ff
@@ -1416,7 +1417,7 @@ discar1	dex			;  }
 	lda	discard,x	;
 	jsr	intohnd		; intohnd(discard[--DISCREM]);
 	jsr	discsho		; discsho();
-	jsr	animhnd		; animhnd();
+	jsr	handsho		; handsho();
 	rts			;} // findone()
 fndmsg0	.byte	$8c,$af,$92,$a0	; L/R
 	.byte	$81,$92,$92,$8f	; ARRO
