@@ -205,11 +205,11 @@ snpshot	lda	UNDOPTR		;void snpshot(void) {
 	bne	snpshot		; }
 	brk			;  
 	brk			;
-+	sta	REDOMAX		; // UNDOPTR now page number of last valid slot
++	sta	REDOMAX		; // UNDOPTR page number of highest valid slot
 	jsr	initptr		; // REDOMAX has been set to UNDOPTR
 -	dey			; for (y = initptr(UNDOPTR); y; y--) {
 	lda	(ZP+2),y	;
-	sta	(ZP),y		;  zp[y] = zp2[y]; // state byte saved into slot
+	sta	(ZP),y		;  zp[y-1] = zp2[y-1]; // state byte saved slot
 	cpy	#0		;
 	bne	-		; }
 	inc	UNDOPTR		; UNDOPTR++;
@@ -225,7 +225,7 @@ undomov	dec	UNDOPTR		;void undomov(void) {
 +	jsr	initptr		;  register uint8_t y;
 -	dey			;
 	lda	(ZP),y		;  for (y = initptr(UNDOPTR); y; y--) {
-	sta	(ZP+2),y	;   zp2[y] = zp[y]; // slot byte saved into state
+	sta	(ZP+2),y	;   zp2[y-1] = zp[y-1]; // slot byte saved state
 	cpy	#0		;  }
 	bne	-		; }
 	jmp	redraws		; redraws();
@@ -240,7 +240,7 @@ redomov	lda	UNDOPTR		;void redomov(void) {
 	jsr	initptr		; register uint8_t y;
 -	dey			;
 	lda	(ZP),y		; for (y = initptr(UNDOPTR); y; y--) {
-	sta	(ZP+2),y	;  zp2[y] = zp[y]; // slot byte saved into state
+	sta	(ZP+2),y	;  zp2[y-1] = zp[y-1]; // slot byte saved state
 	cpy	#0		;
 	bne	-		; }
 	jmp	redraws		; redraws();
@@ -251,7 +251,7 @@ redoall	lda	REDOMAX		;void redoall(void) {
 	rts			;  return; // can't redo any more; hold fast
 +	sta	UNDOPTR		; UNDOPTR = REDOMAX;
 	sec			; for (y = initptr(REDOMAX - 1); y; y--) {
-	sbc	#1		;  zp2[y] = zp[y]; // slot byte saved into state
+	sbc	#1		;  zp2[y-1] = zp[y-1]; // slot byte saved state
 	jsr	initptr		; }
 	jmp	-		;} // redoall()
 	
@@ -374,7 +374,7 @@ newhand	jsr	drw4hnd		;  do {
 	bne	+		;   if (HANDFOM == 0)
 	brk			;    exit(1); // more than 44 cards in stacks?!?
 	.byte	$1		;
-+	jsr	snpshot		;   snpshot();
++	jsr	snpshot		;   snpshot();// undo state saved on a new hand
 	jsr	handsho		;   handsho();// draw empty deck pile after if 0
 	jsr	discsho		;   discsho();// ,empty discard pile if shuffled
 	lda	HANDFOM		;
@@ -552,7 +552,7 @@ wndleft	digitxy	NWOUNDS,WDX,WDY	;   }
 	bcc	+		;   if (NWOUNDS >= 3)
 	jmp	youlost		;    exit(0);
 +	jsr	handsho		;   handsho(); // show the played slot as blank
-	jsr	snpshot		;   snpshot();
+	jsr	snpshot		;   snpshot();//after card play, save undo state
 	lda	HANDREM		;
 	beq	+		;
 	jmp	getmove		;  } while (HANDREM);
