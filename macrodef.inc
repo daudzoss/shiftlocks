@@ -98,9 +98,10 @@ digitxy	.macro	d,x,y,mask0f=$8f;inline void digitxy(const uint8_t* d, const
 	and SCREENM+\x+SCREENW*\y
 	ora	\d		; register uint8_t a =SCREENM[x+SCREENW*y]&0x80;
 	.if \mask0f
-	 and	#\mask0f	; if (m) a &= m;
+	 and	#\mask0f	; SCREENM[x+SCREENW*y] =
 	.endif
-	ora	#$30		; SCREENM[x+SCREENW*y] = a | *d | '0';
+	clc			;            (a | *d) &
+	adc	#$30		;                   (mask0f ? 0xff : 0x8f)+ '0';
 	sta SCREENM+\x+SCREENW*\y
 	.endm			;} // digitxy()
 
