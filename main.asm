@@ -360,7 +360,77 @@ redraws	jsr	discsho		;void redraws(void) {
 	tax			;
 	dex			;
 	bne	-		; }
-;;; FIXME: need to loop through STACK[8~11] redrawing all	
+	
+	ldy	#$40		;
+-	dey			;
+	tya			; for (register uint8_t y = 4*16; y; y--) {
+	pha;1:index y preserved	;  register uint8_t x, y_;
+	lsr			;  register uint1_t c;
+	lsr			;
+	lsr			;
+	lsr			;
+	tax			;  x = (y-1) >> 4; // 0~3
+	pha;2:current column 0~3;
+	tya			;
+	and	#$0f		;
+	clc			;
+	adc	#1		;  a = ((y-1) & 0x0f) + 1; // 1~16
+	cmp	STACKHT+8,x	;
+	bcc	++		;
+	beq	+		;  if (a > STACKHT[8+x]) { // above stack top
+.if 0
+	clc			;
+	adc	stacky+8	;   y_ = stacky[8] + a;
+.endif
+	tay			;   y_ = a;
+	pla;2->1		;
+	tax			;
+	clc			;
+	lda	stackx+8,x	;
+	tax			;   x = stackx[8+x]; // stackx[8~11];
+	;pla;1->0		;
+	;tay			;
+	;pha;1:index y preserved;
+	clc			;   c = 0;
+	lda	#NONCARD	;   a = NONCARD; // blank 3x5
+	jmp	+++		;  } else if (a == STACKHT[8+x]) { // visible
++
+.if 0
+	clc			;
+	adc	stacky+8	;   y_ = stacky[8] + a;
+.endif
+	tay			;   y_ = a;
+	pla;2->1		;
+	tax			;
+	clc			;
+	lda	stackx+8,x	;
+	tax			;   x = stackx[8+x]; // stackx[8~11];
+	pla;1->0		;
+	tay			;
+	pha;1:index y preserved	;
+	clc			;   c = 0;
+	lda	ODRAWER,y	;   a = ODRAWER[y-1]; // entire 3x5 card on top
+	jmp	++		;  } else /* if (a < STACKHT[8+x]) */ { // hid
++
+.if 0
+	clc			;
+	adc	stacky+8	;   y_ = stacky[8] + a;
+.endif
+	tay			;   y_ = a;
+	pla;2->1		;
+	tax			;
+	clc			;
+	lda	stackx+8,x	;
+	tax			;   x = stackx[8+x]; // stackx[8~11];
+	pla;1->0		;
+	tay			;
+	pha;1:index y preserved	;
+	sec			;   c = 1;
+	lda	ODRAWER,y	;   a = ODRAWER[y-1]; // top 3x1 edge in between
++	jsr	cardsho		;  }
+	pla			;  cardsho(c, a, x, y_);
+	tay			;
+	bne	-		; }
 	rts			;} // redraws()
 
 stddeck	.byte	$00,$00,$00,$00,$00,$00,$00,$00
