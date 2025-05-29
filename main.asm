@@ -178,22 +178,89 @@ initptr	sta	1+ZP		;register uint8_t initptr(register uint8_t a) {
 	ldy	#UNDOEND-UNDOABL; return y = UNDOEND-UNDOABL; // #bytes to save
 	rts			;} // initptr()
 	
-memprob	jsr	initptr		;void memprob(register uint8_t a) {
-; lda #$40
-; rts
--	lda	#$55		; register uint8_t y = initptr(a);
-	sta	(ZP),y		; do {
-	lda	(ZP),y		;  zp[y] = 0x55; // one beyond last state byte
-	cmp	#$55		;  if (zp[y] != 0x55)
-	bne	+		;   break;
+memprob	sta	1+ZP		;void memprob(register uint8_t a) {
+	clc			;
+	adc	#$40		;
+	sta	1+ZP+2		;
+	lda	#0		;
+	sta	ZP		; uint8_t* zp = a << 8;
+	sta	ZP+2		; uint8_t* zp2 = zp + 0x4000; // detect 16k wrap
+	ldy	#$ff		; register uint8_t y = 0xff; // 0 might be ports
+	
+-	lda	(ZP),y		; do {
+	sta	TEMPVAR		;  TEMPVAR = zp[y];
+	lda	#$55		;
+	sta	(ZP),y		;  zp[y] = 0x55; // one beyond last state byte
+	lda	(ZP),y		;  a = zp[y];
+	cmp	#$55		;
+	php			;
+	lda	TEMPVAR		;
+	sta	(ZP),y		;  zp[y] = TEMPVAR;
+	plp			;  if (zp[y] != 0x55)
+	bne	++		;   return a = zp >>8; // page where read failed
+	pha			;  uint8_t stack  = TEMPVAR;
+	lda	#$55		;
+	sta	(ZP),y		;  zp[y] = 0x55;
+	lda	(ZP+2),y	;
+	sta	TEMPVAR		;  TEMPVAR = zp2[y];
+	lda	#$aa		;
+	sta	(ZP+2),y	;  zp2[y] = 0xaa;
+	lda	(ZP),y		;  a = zp[y]; // should still be 0x55
+	cmp	#$aa		;
+	php			;
+	pla			;
+	tax			;  x = a == 0xaa; // and not have change to 0xaa
+	pla			;
+	sta	(ZP),y		;  zp[y] = stack;
+	lda	TEMPVAR		;
+	sta	(ZP+2),y	;  zp2[y] = TEMPVAR;
+	txa			;
+	pha			;  if (x) // zp[y] did contain 0x55 so a write
+	plp			;         // to 4k above it indeed clobbered ti
+	beq	+		;   break;
+	lda	(ZP),y		;
+	sta	TEMPVAR		;  TEMPVAR = zp[y];
 	lda	#$aa		;
 	sta	(ZP),y		;  zp[y] = 0xaa; // all bits flipped from 0x55
 	lda	(ZP),y		;
 	cmp	#$aa		;  if (zp[y] != 0xaa)
-	bne	+		;   break;
+	php			;
+	lda	TEMPVAR		;
+	sta	(ZP),y		;  zp[y] = stack;
+	plp			;
+	bne	++		;   return a = zp >>8; // page where read failed
 	inc	1+ZP		;
-	jmp	-		; } while (zp += 0x0100); // nix infinite wrap
-+	lda	1+ZP		; return a = zp >>8; // page where reads failed
+	inc	1+ZP+2		;
+	bne	-		; } while (zp += 0x0100); // nix infinite wrap
++	lda	#>undobuf	;
+	ora	#$0f		;
+	clc			;
+	adc	#1		;
+ 	rts			; return a = (undobuf|0x0fff)+1;//end of 4k buf
++	lda	1+ZP		;
+.if 0
+	pha			;
+	lsr			;
+	lsr			;
+	lsr			;
+	lsr			;
+	cmp	#9+1		;
+	bcc	+		;
+	sec			;
+	sbc	#$39		;
++	sta	TEMPVAR		;
+	digitxy	TEMPVAR,$4,$16,0;
+	pla			;
+	pha			;
+	and	#$0f		;
+	cmp	#9+1		;
+	bcc	+		;
+	sec			;
+	sbc	#$39		;
++	sta	TEMPVAR		;
+	digitxy	TEMPVAR,$5,$16,0;
+	pla			;
+.endif
 	rts			;} // memprob()
 
 snpshot	ldx	UNDOPTR		;void snpshot(void) {
@@ -351,13 +418,6 @@ main
 	sta	DISCREM		;
 	sta	HANDREM		;
 	sta	NWOUNDS		; NWOUNDS = DISCREM = HANDREM = 0;
-	lda	#>undobuf	;
-	tax			;
-	dex			;// UNDOPTR always points to the slot reflecting
-	stx	UNDOPTR		;// the current state, REDOMAX its maximum limit
-	stx	REDOMAX		; UNDOPTR = REDOMAX = (undobuf - 0x0100) >> 8;
-	jsr	memprob		;
-	sta	UNDOLIM		; UNDOLIM = memprob(undobuf); // deduce R/W area
 .if BASIC
 	jsr	bckdrop		; bckdrop(); // draw most of the scren
 .endif
@@ -366,6 +426,13 @@ main
 	jsr	discsho		; discsho(); // show the empty discard pile
 	jsr	initstk		; initstk(); // empty the crime scene and office
 	jsr	animshf		; animshf(); // shuffle deck briefly onscreen
+	lda	#>undobuf	;
+	tax			;
+	dex			;// UNDOPTR always points to the slot reflecting
+	stx	UNDOPTR		;// the current state, REDOMAX its maximum limit
+	stx	REDOMAX		; UNDOPTR = REDOMAX = (undobuf - 0x0100) >> 8;
+	jsr	memprob		;
+	sta	UNDOLIM		; UNDOLIM = memprob(undobuf); // deduce R/W area
 
 newhand	lda	#2		; do {// until we have a hand that is acceptable
 	sta	TOSCENE		;  TOSCENE = TOFFICE = 2; // mandatory unplayed
