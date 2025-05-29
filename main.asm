@@ -386,13 +386,13 @@ redraws	jsr	discsho		;void redraws(void) {
 	jmp	++		;  } else /* if (a < STACKHT[8+x]) */ { // hid
 +	sec			;   c = 1;
 	lda	ODRAWER,y	;   a = ODRAWER[y-1]; // top 3x1 edge in between
-+	pha			;
++	pha			;  }
 	lda	stackx+8,x	;
-	tax			;   x = stackx[8+x];
+	tax			;  x = stackx[8+x];
 	pla			;
-	ldy	TEMPVAR		;   y_ = TEMPVAR;
-	jsr	cardsho		;  }
-	pla			;  cardsho(c, a, x, y_);
+	ldy	TEMPVAR		;  y_ = TEMPVAR;
+	jsr	cardsho		;  cardsho(c, a, x, y_);
+	pla			;
 	tay			;
 	bne	-		; }
 	rts			;} // redraws()
