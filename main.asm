@@ -154,6 +154,21 @@ UNDOLIM = UNSAVED + $0b		; first byte not read-writeable in RAM
 REDOMAX	= UNSAVED + $0c
 SCRATCH	= UNSAVED + $10		; must be last
 
+F1_KEY	= $85
+F3_KEY	= $86
+F5_KEY	= $87
+F7_KEY	= $88
+F2_KEY	= $89
+F4_KEY	= $8a
+F6_KEY	= $8b
+F8_KEY	= $8c
+DEL_KEY	= $14
+INS_KEY	= $94
+HOM_KEY = $13
+CLR_KEY = $93
+
+start
+
 initptr	sta	1+ZP		;register uint8_t initptr(register uint8_t a) {
 	lda	#>UNDOABL	; zp = (uint8_t*) (a << 8); // save slot to use
 	sta	1+ZP+2		; zp2 = (uint8_t*) UNDOABL; // latest game state
@@ -177,13 +192,14 @@ memprob	jsr	initptr		;void memprob(register uint8_t a) {
 	cmp	#$aa		;  if (zp[y] != 0xaa)
 	bne	+		;   break;
 	inc	1+ZP		;
-	bne	-		; } while (zp += 0x0100); // stop infinite wrap
+	bne	-		; } while (zp += 0x0100); // nix infinite wrap
 	lda	1+ZP		; return a = zp >>8; // page where reads failed
 +	rts			;} // memprob()
 
-snpshot	lda	UNDOPTR		;void snpshot(void) {
-	cmp	UNDOLIM		; register uint8_t x, y;
-	bcc	+		; while (UNDOPTR >= UNDOLIM) { // all slots full
+snpshot	ldx	UNDOPTR		;void snpshot(void) {
+	inx			; register uint8_t x, y;
+	cpx	UNDOLIM		;
+	bcc	+		; while (UNDOPTR + 1 >= UNDOLIM) { // slots full
 	ldx	#>undobuf	;
 	lda	#0		;
 	sta	ZP		;
@@ -201,19 +217,19 @@ snpshot	lda	UNDOPTR		;void snpshot(void) {
 	inx			;
 	cpx	UNDOLIM		;
 	bcc	--		;  }
-	dec	UNDOPTR		;  if (!--UNDOPTR) exit(0); // stop infinite wrap
+	dec	UNDOPTR		;  if (!--UNDOPTR) exit(0); // nix infinite wrap
 	bne	snpshot		; }
 	brk			;  
 	brk			;
-+	sta	REDOMAX		; // UNDOPTR page number of highest valid slot
-	jsr	initptr		; // REDOMAX has been set to UNDOPTR
++	txa			; // UNDOPTR is highest used slot's page number
+	sta	UNDOPTR		; UNDOPTR++;
+	sta	REDOMAX		; REDOMAX = UNDOPTR;
+	jsr	initptr		; // REDOMAX is increased in tandem with UNDOPTR
 -	dey			; for (y = initptr(UNDOPTR); y; y--) {
 	lda	(ZP+2),y	;
-	sta	(ZP),y		;  zp[y-1] = zp2[y-1]; // state byte saved slot
+	sta	(ZP),y		;  zp[y-1] = zp2[y-1];//saved slot<-state byte
 	cpy	#0		;
 	bne	-		; }
-	inc	UNDOPTR		; UNDOPTR++;
-	inc	REDOMAX		; REDOMAX++;
 	rts			;} //snpshot()
 
 undomov	dec	UNDOPTR		;void undomov(void) {
@@ -225,10 +241,10 @@ undomov	dec	UNDOPTR		;void undomov(void) {
 +	jsr	initptr		;  register uint8_t y;
 -	dey			;
 	lda	(ZP),y		;  for (y = initptr(UNDOPTR); y; y--) {
-	sta	(ZP+2),y	;   zp2[y-1] = zp[y-1]; // slot byte saved state
+	sta	(ZP+2),y	;   zp2[y-1] = zp[y-1];//saved state<-slot byte
 	cpy	#0		;  }
-	bne	-		; }
-	jmp	redraws		; redraws();
+	bne	-		;  redraws();
+	jmp	redraws		; }
 	;rts			;} // undomov()
 
 redomov	lda	UNDOPTR		;void redomov(void) {
@@ -240,18 +256,16 @@ redomov	lda	UNDOPTR		;void redomov(void) {
 	jsr	initptr		; register uint8_t y;
 -	dey			;
 	lda	(ZP),y		; for (y = initptr(UNDOPTR); y; y--) {
-	sta	(ZP+2),y	;  zp2[y-1] = zp[y-1]; // slot byte saved state
+	sta	(ZP+2),y	;  zp2[y-1] = zp[y-1];//saved state<-slot byte
 	cpy	#0		;
 	bne	-		; }
 	jmp	redraws		; redraws();
 	;rts			;} // redomov()
 redoall	lda	REDOMAX		;void redoall(void) {
-	cmp	UNDOPTR		;
-	bne	+		; if (UNDOPTR == REDOMAX)
-	rts			;  return; // can't redo any more; hold fast
-+	sta	UNDOPTR		; UNDOPTR = REDOMAX;
-	sec			; for (y = initptr(REDOMAX - 1); y; y--) {
-	sbc	#1		;  zp2[y-1] = zp[y-1]; // slot byte saved state
+	cmp	UNDOPTR		; if (UNDOPTR != REDOMAX) {// slots left to undo
+	bne	+		;  UNDOPTR = REDOMAX;
+	rts			;  for (y = initptr(UNDOPTR); y; y--)
++	sta	UNDOPTR		;   zp2[y-1] = zp[y-1];//saved state<-slot byte
 	jsr	initptr		; }
 	jmp	-		;} // redoall()
 	
@@ -281,21 +295,6 @@ redraws	jsr	discsho		;void redraws(void) {
 	bne	-		; }
 ;;; FIXME: need to loop through STACK[8~11] redrawing all	
 	rts			;} // redraws()
-
-F1_KEY	= $85
-F3_KEY	= $86
-F5_KEY	= $87
-F7_KEY	= $88
-F2_KEY	= $89
-F4_KEY	= $8a
-F6_KEY	= $8b
-F8_KEY	= $8c
-DEL_KEY	= $14
-INS_KEY	= $94
-HOM_KEY = $13
-CLR_KEY = $93
-
-start
 
 stddeck	.byte	$00,$00,$00,$00,$00,$00,$00,$00
 	.byte	$01,$01,$01,$01,$01,$01,$01,$01
@@ -341,8 +340,6 @@ stackx	.byte	$00,$04,$08,$0c
 	.byte	$16,$1b,$20,$25
 stacky	.byte	9,9,9,9,1,1,1,1
 	.byte	1,1,1,1		;
-;stacklm	.byte	1,1,1,1,1,1,1,1	;bottom card of a stack allowed to grow up to...
-;	.byte	$10,$10,$10,$10	;16 (alternating invest with threat or removals)
 
 main
 .if !BASIC
@@ -355,10 +352,12 @@ main
 	sta	HANDREM		;
 	sta	NWOUNDS		; NWOUNDS = DISCREM = HANDREM = 0;
 	lda	#>undobuf	;
-	sta	UNDOPTR		;
-	sta	REDOMAX		; UNDOPTR = REDOMAX = undobuf;
+	tax			;
+	dex			;// UNDOPTR always points to the slot reflecting
+	stx	UNDOPTR		;// the current state, REDOMAX its maximum limit
+	stx	REDOMAX		; UNDOPTR = REDOMAX = (undobuf - 0x0100) >> 8;
 	jsr	memprob		;
-	sta	UNDOLIM		; UNDOLIM = memprob(UNDOPTR);
+	sta	UNDOLIM		; UNDOLIM = memprob(undobuf); // deduce R/W area
 .if BASIC
 	jsr	bckdrop		; bckdrop(); // draw most of the scren
 .endif
@@ -408,8 +407,10 @@ getmove	jsr	cdwnsho		;  do {
 +	cmp	#CLR_KEY	;
 	bne	+		;   } else if (a == CLR_KEY) {
 	lda	#>undobuf	;
+	tax			;
+	dex			;
 	sta	UNDOPTR		;
-	sta	REDOMAX		;    UNDOPTR = REDOMAX = undobuf;	
+	sta	REDOMAX		;    UNDOPTR = REDOMAX =(undobuf - 0x0100) >> 8;
 	jmp	getmove		;    continue;
 
 	
@@ -585,6 +586,16 @@ cdwnsho	lda	TOSCENE		;void cdwnsho(void) {
 	lda	TOFFICE		; bubble2(TOSCENE, SCREENM, 0x10, 0x09);
 	bubble2	SCREENM,$15,$3d	; bubble2(TOFFICE, SCREENM, 0x14, 0x15);
 .endif
+	lda	UNDOPTR		;
+	and	#$07		;
+	sta	TEMPVAR		;
+	digitxy	TEMPVAR,$0,$16	;
+
+	lda	REDOMAX		;
+	and	#$07		;
+	sta	TEMPVAR		;
+	digitxy	TEMPVAR,$2,$16	;
+
 	rts			;} // cdwnsho()
 
 ARROWOD	= SCREENM+SCREENW*$0f+1-2
