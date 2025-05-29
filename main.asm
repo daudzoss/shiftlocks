@@ -367,8 +367,10 @@ main
 	jsr	initstk		; initstk(); // empty the crime scene and office
 	jsr	animshf		; animshf(); // shuffle deck briefly onscreen
 
-				; do {
-newhand	jsr	drw4hnd		;  do {
+newhand	lda	#2		; do {// until we have a hand that is acceptable
+	sta	TOSCENE		;  TOSCENE = TOFFICE = 2; // mandatory unplayed
+	sta	TOFFICE		;  // will play half to scene and half to office
+	jsr	drw4hnd		;  do {
 	sta	HANDFOM		;   HANDFOM = drw4hand();// nonzero if we drew 4
 	bne	+		;   if (HANDFOM == 0)
 	brk			;    exit(1); // more than 44 cards in stacks?!?
@@ -378,13 +380,9 @@ newhand	jsr	drw4hnd		;  do {
 	jsr	discsho		;   discsho();// ,empty discard pile if shuffled
 	lda	HANDFOM		;
 	jsr	rejctok		;
-      	beq	+		;
+      	beq	getmove		;
 	jsr	handrej		;
 	bne	newhand		;  } while (rejctok(HANDFOM) && handrej());
-
-+	lda	#2		;  // we have a hand that was acceptable
-	sta	TOSCENE		;  TOSCENE = TOFFICE = 2; // mandatory unplayed
-	sta	TOFFICE		;  // now play half to scene and half to office
 
 getmove	jsr	cdwnsho		;  do {
 	jsr	$ffe4		;   cdwnsho();
