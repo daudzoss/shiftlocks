@@ -179,8 +179,8 @@ initptr	sta	1+ZP		;register uint8_t initptr(register uint8_t a) {
 	rts			;} // initptr()
 	
 memprob	jsr	initptr		;void memprob(register uint8_t a) {
- lda #$40
- rts
+; lda #$40
+; rts
 -	lda	#$55		; register uint8_t y = initptr(a);
 	sta	(ZP),y		; do {
 	lda	(ZP),y		;  zp[y] = 0x55; // one beyond last state byte
@@ -192,9 +192,9 @@ memprob	jsr	initptr		;void memprob(register uint8_t a) {
 	cmp	#$aa		;  if (zp[y] != 0xaa)
 	bne	+		;   break;
 	inc	1+ZP		;
-	bne	-		; } while (zp += 0x0100); // nix infinite wrap
-	lda	1+ZP		; return a = zp >>8; // page where reads failed
-+	rts			;} // memprob()
+	jmp	-		; } while (zp += 0x0100); // nix infinite wrap
++	lda	1+ZP		; return a = zp >>8; // page where reads failed
+	rts			;} // memprob()
 
 snpshot	ldx	UNDOPTR		;void snpshot(void) {
 	inx			; register uint8_t x, y;
@@ -586,16 +586,28 @@ cdwnsho	lda	TOSCENE		;void cdwnsho(void) {
 	lda	TOFFICE		; bubble2(TOSCENE, SCREENM, 0x10, 0x09);
 	bubble2	SCREENM,$15,$3d	; bubble2(TOFFICE, SCREENM, 0x14, 0x15);
 .endif
-	lda	UNDOPTR		;
-	and	#$07		;
-	sta	TEMPVAR		;
-	digitxy	TEMPVAR,$0,$16	;
+.if 0
+	lda	UNDOLIM		;
+	lsr			;
+	lsr			;
+	lsr			;
+	lsr			;
+	cmp	#9+1		;
+	bcc	+		;
+	sec			;
+	sbc	#$39		;
++	sta	TEMPVAR		;
+	digitxy	TEMPVAR,$1,$16,0;
 
-	lda	REDOMAX		;
-	and	#$07		;
-	sta	TEMPVAR		;
-	digitxy	TEMPVAR,$2,$16	;
-
+	lda	UNDOLIM
+	and	#$0f		;
+	cmp	#9+1		;
+	bcc	+		;
+	sec			;
+	sbc	#$39		;
++	sta	TEMPVAR		;
+	digitxy	TEMPVAR,$2,$16,0;
+.endif
 	rts			;} // cdwnsho()
 
 ARROWOD	= SCREENM+SCREENW*$0f+1-2
