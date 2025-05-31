@@ -468,6 +468,12 @@ main
 	stx	REDOMAX		; UNDOPTR = REDOMAX = (undobuf - 0x0100) >> 8;
 	jsr	memprob		;
 	sta	UNDOLIM		; UNDOLIM = memprob(undobuf); // deduce R/W area
+	ldx	#$18		;
+	ldy	#$0a		;
+	lda	#ownmsg1-ownmsg0;
+	txtclip	ownmsg1		;
+	lda	#ownmsg1-ownmsg0;
+	replace	ownmsg0		;
 
 newhand	lda	#2		; do {// until we have a hand that is acceptable
 	sta	TOSCENE		;  TOSCENE = TOFFICE = 2; // mandatory unplayed
@@ -635,7 +641,18 @@ notaneg	.byte	$20,$13,$08,$05	;
 notabuf	.fill	5		;
 .endif
 
-trymove	and	#$03		;
+trymove	pha			;
+	lda	SCREENM+$18+SCREENW*$0a	;
+	cmp	ownmsg0		;
+	bne	+		;
+	ldx	#$18		;
+	ldy	#$0a		;
+	lda	#ownmsg1-ownmsg0;
+	txtclip			;
+	lda	#ownmsg1-ownmsg0;
+	replace	ownmsg1		;
++	pla			;
+	and	#$03		;
 	tay			;
 	lda	HAND,y		;
 	cmp	#8		;
@@ -671,6 +688,22 @@ mainend	handmsg	wonmsg0,wonmsg1-wonmsg0,wonmsg2-wonmsg1,SCRATCH
 	beq 	-		; } while (getchar());
 	handmsg	SCRATCH,wonmsg1-wonmsg0,wonmsg2-wonmsg1
 tobasic	rts			;} // main()
+ownmsg0	.byte	$01,$0c,$0c,$20	; ALL
+	.byte	$12,$09,$07,$08	; RIGH
+	.byte	$14,$13,$20,$17	; TS W
+	.byte	$09,$13,$05,$20	; ISE
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20,$20	;
+	.byte	$20,$20,$20	;
+	.byte	$17,$09,$1a,$01	; WIZA
+	.byte	$12,$04,$20,$07	; RD G
+	.byte	$01,$0d,$05,$13	; AMES
+	.byte	$20,$32,$30,$32	;  202
+	.byte	$34		; 4
+ownmsg1	.fill	ownmsg1-ownmsg0
 wonmsg0	.byte	$19,$0f,$15,$20	; YOU
 	.byte	$17,$0f,$0e,$20	; WON
 	.byte	$14,$08,$05,$20	; THE
