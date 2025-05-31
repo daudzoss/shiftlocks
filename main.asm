@@ -209,7 +209,7 @@ memprob	sta	1+ZP		;void memprob(register uint8_t a) {
 	cmp	#$aa		;
 	php			;
 	pla			;
-	tax			;  x = a == 0xaa; // and not have change to 0xaa
+	tax			;  x = a == 0xaa;// and not have changed to 0xaa
 	pla			;
 	sta	(ZP),y		;  zp[y] = stack;
 	lda	TEMPVAR		;
@@ -692,7 +692,7 @@ cdwnsho	lda	TOSCENE		;void cdwnsho(void) {
 	lda	TOFFICE		; bubble2(TOSCENE, SCREENM, 0x10, 0x09);
 	bubble2	SCREENM,$15,$3d	; bubble2(TOFFICE, SCREENM, 0x14, 0x15);
 .endif
-.if 1
+.if 0
 	lda	UNDOLIM		;
 	lsr			;
 	lsr			;
