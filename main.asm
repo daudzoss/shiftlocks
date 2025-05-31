@@ -339,7 +339,8 @@ redoall	lda	REDOMAX		;void redoall(void) {
 redraws	jsr	discsho		;void redraws(void) {
 	jsr	drawsho		; discsho();
 	jsr 	handsho		; drawsho();
-	ldx	#8		; handsho();
+	digitxy	NWOUNDS,WDX,WDY	; handsho();
+	ldx	#8		; digitxy(NWOUNDS, WDX, WDY);
 -	txa			; for (register uint8_t x = 8; x; x--) {
 	pha			;  register uint8_t a;
 	lda	STACKHT-1,x	;
@@ -493,8 +494,15 @@ getmove	jsr	cdwnsho		;  do {
 	jsr	undomov		;    undomov();
 	jmp	getmove		;    continue;
 
++	ldy	NWOUNDS		;   }
+	cpy	#3		;   if (NWOUNDS < 3) {// once lost: undo or quit
+	bcc	+		;    if (askquit())
+	jsr	askquit		;     exit(1);
+	beq	getmove		;    else continue;
+	jmp	tobasic		;   }
+	
 +	cmp	#INS_KEY	;
-	bne	+		;   } else if (a == INS_KEY) {
+	bne	+		;   if (a == INS_KEY) {
 	jsr	redomov		;    redomov();   
 	jmp	getmove		;    continue;
 
@@ -512,7 +520,6 @@ getmove	jsr	cdwnsho		;  do {
 	sta	REDOMAX		;    UNDOPTR = REDOMAX =(undobuf - 0x0100) >> 8;
 	jmp	getmove		;    continue;
 
-	
 +	cmp	#'1'		;
 	bcc	notfkey		;   } else if (a >= '1'
 	cmp	#'8'+1		;              &&
@@ -602,7 +609,7 @@ notfkey	cmp	#$5f		; // <-
 	bne	notakey		;   } else if (a == 'q' || a == 'Q') { //->BASIC
 +	jsr	askquit		;
 	beq	notakey		;    if (askquit())
-	rts			;     return;
+	jmp	tobasic		;     return;
 
 .if 0
 notakey	jmp	getmove		;   } else /* handle others here or */ continue;
@@ -647,13 +654,13 @@ acceptw	lda	MOVESEL		;
 	inc	DISCREM		;    DISCREM++;
 	inc	NWOUNDS		;    NWOUNDS++;
 wndleft	digitxy	NWOUNDS,WDX,WDY	;   }
-	lda	NWOUNDS		;   digitxy(NWOUNDS, WDX, WDY);
+	jsr	snpshot		;   digitxy(NWOUNDS, WDX, WDY);
+	jsr	handsho		;   snpshot();//after card play, save undo state
+	lda	NWOUNDS		;   handsho(); // show the played slot as blank
 	cmp	#$03		;
 	bcc	+		;   if (NWOUNDS >= 3)
-	jmp	youlost		;    exit(0);
-+	jsr	handsho		;   handsho(); // show the played slot as blank
-	jsr	snpshot		;   snpshot();//after card play, save undo state
-	lda	HANDREM		;
+	jmp	getmove		;    continue; // in case player wants to undo
++	lda	HANDREM		;
 	beq	+		;
 	jmp	getmove		;  } while (HANDREM);
 +	jsr	gamewon		;
@@ -663,7 +670,7 @@ mainend	handmsg	wonmsg0,wonmsg1-wonmsg0,wonmsg2-wonmsg1,SCRATCH
 -	jsr	$ffe4		; do {
 	beq 	-		; } while (getchar());
 	handmsg	SCRATCH,wonmsg1-wonmsg0,wonmsg2-wonmsg1
-youlost	rts			;} // main()
+tobasic	rts			;} // main()
 wonmsg0	.byte	$19,$0f,$15,$20	; YOU
 	.byte	$17,$0f,$0e,$20	; WON
 	.byte	$14,$08,$05,$20	; THE
@@ -685,7 +692,7 @@ cdwnsho	lda	TOSCENE		;void cdwnsho(void) {
 	lda	TOFFICE		; bubble2(TOSCENE, SCREENM, 0x10, 0x09);
 	bubble2	SCREENM,$15,$3d	; bubble2(TOFFICE, SCREENM, 0x14, 0x15);
 .endif
-.if 0
+.if 1
 	lda	UNDOLIM		;
 	lsr			;
 	lsr			;
